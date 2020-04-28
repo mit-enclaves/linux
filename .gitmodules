@@ -1,0 +1,3 @@
+[submodule "riscv-linux"]
+	path = build_linux/riscv-linux
+	url = git@github.com:riscv/riscv-linux.git

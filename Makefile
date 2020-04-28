@@ -48,15 +48,16 @@ RUN_LINUX_INCLUDES := \
 	$(SM_PLATFORM_DIR)
 
 # Linux Binary
-.PHONY: check_linux_elf_env
-check_linux_elf_env:
-ifndef LINUX_ELF
-	$(error LINUX_ELF is undefined)
-endif
+BUILD_LINUX_DIR:=$(RUN_LINUX_DIR)/build_linux
 
+LINUX_ELF := $(BUILD_LINUX_DIR)/riscv-linux/vmlinux
 LINUX_BIN := $(BUILD_DIR)/vmlinux.bin
 
-$(LINUX_BIN): $(LINUX_ELF) check_linux_elf_env 
+include $(BUILD_LINUX_DIR)/Makefile
+
+$(LINUX_ELF):=build_linux
+
+$(LINUX_BIN): $(LINUX_ELF) 
 	$(LINUX_OBJCOPY) -O binary --set-section-flags .bss=alloc,load,contents $< $@
 
 # Targets
