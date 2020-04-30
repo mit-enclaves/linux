@@ -9,7 +9,7 @@ else
 fi
 
 CURDIR=`pwd`
-BUILD_DIR=$CURDIR/../build/busybox
+BUILD_DIR=$CURDIR/build/busybox
 
 mkdir -p $BUILD_DIR
 
@@ -18,7 +18,7 @@ rm -rf busybox*
 wget https://busybox.net/downloads/busybox-1.21.1.tar.bz2
 tar -xf busybox-1.21.1.tar.bz2
 cd busybox-1.21.1
-cp $CURDIR/linux_configs/busybox_config .config
+cp $CURDIR/build_linux/linux_configs/busybox_config .config
 make -j$JOBS
 
 cd $CURDIR

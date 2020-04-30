@@ -8,11 +8,12 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--testdir', dest = 'test_dir',
-                    required = False, default = '../linux_apps')
+                    required = False, default = 'linux_apps')
 parser.add_argument('--jobs', dest = 'jobs', required = False, default = 1)
 args = parser.parse_args()
 
 root = os.environ['PWD']
+root = os.path.join(root, 'build_linux')
 linux_dir = os.path.join(root, 'riscv-linux')
 config_dir = os.path.join(root, 'linux_configs')
 build_dir = os.path.join(root, '../build')

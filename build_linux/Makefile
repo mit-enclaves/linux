@@ -6,10 +6,11 @@ all: build_linux
 # Busybox
 BUSYBOX=$(BUILD_DIR)/busybox/busybox-1.21.1/busybox
 $(BUSYBOX):
-	./$(BUILD_LINUX_DIR)/build-busybox.sh
+	$(BUILD_LINUX_DIR)/build-busybox.sh
 
 # Terminate
-include $(BUILD_LINUX_DIR)/terminate/Makefile
+TERMINATE_DIR:=$(BUILD_LINUX_DIR)/terminate
+include $(TERMINATE_DIR)/Makefile
 
 # Build Linux
 .PHONY: build_linux
