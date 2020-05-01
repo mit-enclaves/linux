@@ -1,0 +1,13 @@
+# obj files
+*.o
+*.ko
+*.cmd
+*.mod.c
+
+# Arctefacts
+.tmp_versions
+Module.symvers
+modules.order
+
+# Binary
+a.out

@@ -17,6 +17,7 @@ root = os.path.join(root, 'build_linux')
 linux_dir = os.path.join(root, 'riscv-linux')
 config_dir = os.path.join(root, 'linux_configs')
 build_dir = os.path.join(root, '../build')
+sm_kernel = os.path.join(root, 'sm_kernel_module')
 test_dir = '' if args.test_dir == '' else os.path.abspath(args.test_dir)
 
 # copy initramfs.txt and .config
@@ -42,7 +43,8 @@ if test_dir != '':
                                                         perm))
                 else:
                     raise Exception('unknown file type ' + src_path)
-        writeTree('/test', test_dir)
+        #writeTree('/test', test_dir)
+        writeTree('/test', sm_kernel)
 
 # compile vmlinux
 cmd = 'cd {}; make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- -j{}'.format(linux_dir, args.jobs)
