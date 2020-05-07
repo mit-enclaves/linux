@@ -33,7 +33,7 @@ void start_enclave(struct arg_start_enclave *arg)
   printk(KERN_INFO "Start routine start_enclave");
   dma_addr_t dma_addr;
 
-  void* addr = dma_alloc_coherent(security_monitor_dev, 4*0x2000, &dma_addr, GFP_KERNEL);
+  void* addr = dma_alloc_coherent(security_monitor_dev, 5*(0x1000000), &dma_addr, GFP_KERNEL);
   if (addr == 0) {
     printk(KERN_ALERT "Error dma allocation");
     return (int)addr;
@@ -142,6 +142,7 @@ void start_enclave(struct arg_start_enclave *arg)
 
   int num_pages_enclave = (((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE;
   int page_count;
+  printk(KERN_INFO "Page count %x\n", num_pages_enclave);
   for(page_count = 0; page_count < num_pages_enclave; page_count++) {
 
     arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL);
@@ -217,8 +218,8 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         dma_addr_t dma_addr;
                         size_t size_enclave =  arg_struct.enclave_end - arg_struct.enclave_start;
 
-                        printk(KERN_INFO "Allocate physical memory for binary image\n");
-                        void* addr = dma_alloc_coherent(security_monitor_dev, size_enclave/0x1000, &dma_addr, GFP_KERNEL);
+                        printk(KERN_INFO "Allocate %lx physical memory for binary image\n", size_enclave);
+                        void* addr = dma_alloc_coherent(security_monitor_dev, size_enclave, &dma_addr, GFP_KERNEL);
                         if (addr == 0) {
                           printk(KERN_ALERT "Error dma allocation");
                           return (int)addr;
