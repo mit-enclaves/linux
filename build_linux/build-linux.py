@@ -46,11 +46,6 @@ if test_dir != '':
         #writeTree('/test', test_dir)
         writeTree('/test', sm_kernel)
 
-patch = os.path.join(root, 'linux.patch')
-# apply patch
-cmd = 'cd {}; git apply {}'.format(linux_dir, patch)
-subprocess.check_call(cmd, shell = True)
-
 # compile vmlinux
 cmd = 'cd {}; make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- -j{}'.format(linux_dir, args.jobs)
 print 'Running: {}'.format(cmd)

@@ -1,6 +1,6 @@
 # Assumes: $(SM_BUILD_DIR)
 # Assumes: $(SANCTUM_QEMU)
-# Assumes: $(LINUX_ELF)
+# Assumes: $(VMLINUX)
 
 # Find the Root Directory
 RUN_LINUX_DIR:=$(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
@@ -50,15 +50,20 @@ RUN_LINUX_INCLUDES := \
 # Linux Binary
 BUILD_LINUX_DIR:=$(RUN_LINUX_DIR)/build_linux
 
-LINUX_ELF := $(BUILD_LINUX_DIR)/riscv-linux/vmlinux
-LINUX_BIN := $(BUILD_DIR)/vmlinux.bin
-
 include $(BUILD_LINUX_DIR)/Makefile
 
-$(LINUX_ELF):=build_linux
+.PHONY: check_vmlinux
+check_vmlinux:
+ifndef VMLINUX
+$(info Default value for $$VMLINUX)
+VMLINUX := $(BUILD_LINUX_DIR)/riscv-linux/vmlinux
+else
+$(info $$VMLINUX was defined as [${VMLINUX}])
+endif
+LINUX_BIN := $(BUILD_DIR)/vmlinux.bin
 
-$(LINUX_BIN): $(LINUX_ELF) 
-	$(LINUX_OBJCOPY) -O binary --set-section-flags .bss=alloc,load,contents $< $@
+$(LINUX_BIN): check_vmlinux $(VMLINUX) 
+	$(LINUX_OBJCOPY) -O binary --set-section-flags .bss=alloc,load,contents $(VMLINUX) $@
 
 # Targets
 $(BUILD_DIR):
