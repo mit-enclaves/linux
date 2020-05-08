@@ -1,0 +1,33 @@
+diff --git a/arch/riscv/include/asm/dma-mapping.h b/arch/riscv/include/asm/dma-mapping.h
+index 8facc1c8f..71058f156 100644
+--- a/arch/riscv/include/asm/dma-mapping.h
++++ b/arch/riscv/include/asm/dma-mapping.h
+@@ -2,6 +2,7 @@
+ #ifndef _RISCV_ASM_DMA_MAPPING_H
+ #define _RISCV_ASM_DMA_MAPPING_H 1
+ 
++#include <linux/dma-contiguous.h>
+ #ifdef CONFIG_SWIOTLB
+ #include <linux/swiotlb.h>
+ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+diff --git a/arch/riscv/kernel/setup.c b/arch/riscv/kernel/setup.c
+index 2c290e6aa..393987e7e 100644
+--- a/arch/riscv/kernel/setup.c
++++ b/arch/riscv/kernel/setup.c
+@@ -30,6 +30,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/sched/task.h>
+ #include <linux/swiotlb.h>
++#include <linux/dma-contiguous.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/sections.h>
+@@ -237,7 +238,7 @@ void __init setup_arch(char **cmdline_p)
+ 	setup_bootmem();
+ 	paging_init();
+ 	unflatten_device_tree();
+-
++    dma_contiguous_reserve(0); 
+ #ifdef CONFIG_SWIOTLB
+ 	swiotlb_init(1);
+ #endif
