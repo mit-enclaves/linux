@@ -10,7 +10,9 @@
 #include <linux/dma-mapping.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
+#include <linux/cma.h>
 #include <linux/spinlock.h>
+#include <linux/irqflags.h>
 
 #include "api/api_untrusted.h"
 
@@ -32,15 +34,15 @@ void start_enclave(struct arg_start_enclave *arg)
 
   printk(KERN_INFO "Start routine start_enclave");
   dma_addr_t dma_addr;
-
-  void* addr = dma_alloc_coherent(security_monitor_dev, 5*(0x1000000), &dma_addr, GFP_KERNEL);
-  if (addr == 0) {
-    printk(KERN_ALERT "Error dma allocation");
-    return (int)addr;
+  void* addr = dma_alloc_coherent(security_monitor_dev, 0x5000000, &dma_addr, GFP_KERNEL);
+  if (dma_addr == 0) {
+    printk(KERN_ALERT "Error allocation");
+    return;
   }
+  printk(KERN_INFO "dma addr is %x",dma_addr);
   uintptr_t region2;
   uintptr_t region3;
-  if ( (unsigned long long) addr % 0x2000000 == 0) {
+  if ( (unsigned long long) dma_addr % 0x2000000 == 0) {
     region2 = (uintptr_t) dma_addr;
     region3 = (uintptr_t) dma_addr+0x2000000;
   } else {
@@ -48,6 +50,8 @@ void start_enclave(struct arg_start_enclave *arg)
     region2 = (uintptr_t) aligned_dma_addr;
     region3 = (uintptr_t) aligned_dma_addr+0x2000000;
   }
+//  region2 = (uintptr_t) 0xC0000000;
+//  region3 = (uintptr_t) 0xC0000000+0x2000000;
 
   printk(KERN_INFO "Address region1 is %x",region2);
   printk(KERN_INFO "Address region2 is %x",region3);
@@ -75,9 +79,8 @@ void start_enclave(struct arg_start_enclave *arg)
   printk(KERN_INFO "Address metadata is %x",region_metadata_start);
   enclave_id_t enclave_id = ((uintptr_t) region3) + (PAGE_SIZE * region_metadata_start);
   uint64_t num_mailboxes = 1;
-  uint64_t timer_limit = 10000;
 
-  arg->result = sm_enclave_create(enclave_id, 0x0, REGION_MASK, num_mailboxes, timer_limit, true);
+  arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, true);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_create FAILED with error code %d\n", arg->result);
     return;
@@ -142,8 +145,7 @@ void start_enclave(struct arg_start_enclave *arg)
 
   int num_pages_enclave = (((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE;
   int page_count;
-  printk(KERN_INFO "Page count %x\n", num_pages_enclave);
-  for(page_count = 0; page_count < num_pages_enclave; page_count++) {
+  for(page_count = 0; page_count < num_pages_enclave + 1; page_count++) {
 
     arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL);
     if(arg->result != MONITOR_OK) {
@@ -161,8 +163,8 @@ void start_enclave(struct arg_start_enclave *arg)
   uint64_t size_enclave_metadata = sm_enclave_metadata_pages(num_mailboxes);
 
   thread_id_t thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
-
-  arg->result = sm_thread_load(enclave_id, thread_id, 0x0, 0x1000, enclave_handler_address, enclave_handler_stack_pointer);
+  uintptr_t stack_ptr = PAGE_SIZE * (num_pages_enclave + 1) ;
+  arg->result = sm_thread_load(enclave_id, thread_id, 0x0, stack_ptr, enclave_handler_address, enclave_handler_stack_pointer);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 
@@ -178,12 +180,14 @@ void start_enclave(struct arg_start_enclave *arg)
   printk(KERN_INFO "Enclave enter\n");
   arg->result = sm_enclave_enter(enclave_id, thread_id);
   printk(KERN_INFO "Enclaved finished executing with : %d\n", arg->result); 
+  dma_free_coherent(security_monitor_dev, 0x5000000,  addr, dma_addr);
   return;
 }
 
 static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 static ssize_t sm_read(struct file * file, char * buf, size_t count, loff_t *ppos){
     printk(KERN_INFO "read dummy sm");
+    return 0;
 }
 static struct file_operations fops =
   {
@@ -204,6 +208,8 @@ static struct miscdevice security_monitor_misc = {
 
 static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
+        //local_irq_disable();
+
         unsigned long bytes_from_user;
         unsigned long bytes_to_user;
 
@@ -218,7 +224,7 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         dma_addr_t dma_addr;
                         size_t size_enclave =  arg_struct.enclave_end - arg_struct.enclave_start;
 
-                        printk(KERN_INFO "Allocate %lx physical memory for binary image\n", size_enclave);
+                        printk(KERN_INFO "Allocate physical memory for binary image\n");
                         void* addr = dma_alloc_coherent(security_monitor_dev, size_enclave, &dma_addr, GFP_KERNEL);
                         if (addr == 0) {
                           printk(KERN_ALERT "Error dma allocation");
@@ -245,6 +251,8 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         }
                         break;
         }
+        //local_irq_enable();
+        printk(KERN_INFO "renable timer interrupts\n");
         return 0;
 }
 

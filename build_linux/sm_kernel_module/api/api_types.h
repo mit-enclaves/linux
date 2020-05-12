@@ -1,6 +1,9 @@
 #ifndef API_TYPES_H
 #define API_TYPES_H
 
+//#include <stdint.h>
+//#include <stdbool.h>
+
 // SM API Types
 // --------------------
 
@@ -8,7 +11,7 @@ typedef unsigned long long phys_ptr_t;
 typedef phys_ptr_t enclave_id_t;
 typedef phys_ptr_t thread_id_t;
 typedef unsigned long long region_id_t;
-typedef unsigned long long  mailbox_id_t;
+typedef unsigned long long mailbox_id_t;
 
 // reserved, "special" enclave_id values. These must not be valid (this implementation requires enclave_id_t be page-aligned, so these values are safe).
 #define OWNER_UNTRUSTED (1)
