@@ -1,8 +1,6 @@
 # Assume python
 # Assume BUILD_LINUX_DIR
 
-all: build_linux
-
 # Busybox
 BUSYBOX=$(BUILD_DIR)/busybox/busybox-1.21.1/busybox
 $(BUSYBOX):

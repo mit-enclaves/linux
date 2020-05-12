@@ -31,9 +31,13 @@
   run 'make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu-'
   then 'make test'
 
+### test_linux
+
+  Take whatever VMLINUX is passed as an argument and wrap it on top of the SM and a null bootloader
+
 ### run_test_linux
 
-  Take whatever VMLINUX is passed and run it on top of the SM
+  Same but run the obtained image in QEMU
 
 ### debug_test_linux
 

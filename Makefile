@@ -82,7 +82,6 @@ ALL_TESTS_SRC := \
 	$(PLATFORM_DIR)/sm.S \
 	$(PLATFORM_DIR)/idpt.S \
 
-
 $(BUILD_DIR)/test_linux.elf: check_bin_env $(SM_TEST_LD) $(BUILD_DIR) $(SM_BINARY) $(IDPT_BINARY) $(LINUX_BIN) $(RUN_LINUX_LDS)
 	$(CC) $(CFLAGS) $(addprefix -I , \
 	$(RUN_LINUX_INCLUDES)) \
@@ -94,6 +93,8 @@ $(BUILD_DIR)/test_linux.elf: check_bin_env $(SM_TEST_LD) $(BUILD_DIR) $(SM_BINAR
 	-D SM_BINARY_FILE=\"$(SM_BINARY)\" \
 	-D LINUX_FILE=\"$(LINUX_BIN)\" \
 	-o $@
+
+all: test_linux 
 
 .PHONY: test_linux
 test_linux: $(BUILD_DIR)/test_linux.elf
