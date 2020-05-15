@@ -40,36 +40,34 @@ void start_enclave(struct arg_start_enclave *arg)
     return;
   }
   printk(KERN_INFO "dma addr is %x",dma_addr);
+  uintptr_t region1;
   uintptr_t region2;
-  uintptr_t region3;
-  if ( (unsigned long long) dma_addr % 0x2000000 == 0) {
-    region2 = (uintptr_t) dma_addr;
-    region3 = (uintptr_t) dma_addr+0x2000000;
+  if ( (unsigned long long) addr % 0x2000000 == 0) {
+    region1 = (uintptr_t) dma_addr;
+    region2 = (uintptr_t) dma_addr+0x2000000;
   } else {
     unsigned long long aligned_dma_addr = ((((unsigned long long) dma_addr)/0x2000000)+1)*0x2000000; 
-    region2 = (uintptr_t) aligned_dma_addr;
-    region3 = (uintptr_t) aligned_dma_addr+0x2000000;
+    region1 = (uintptr_t) aligned_dma_addr;
+    region2 = (uintptr_t) aligned_dma_addr+0x2000000;
   }
-//  region2 = (uintptr_t) 0xC0000000;
-//  region3 = (uintptr_t) 0xC0000000+0x2000000;
 
-  printk(KERN_INFO "Address region1 is %x",region2);
-  printk(KERN_INFO "Address region2 is %x",region3);
+  printk(KERN_INFO "Address region1 is %x",region1);
+  printk(KERN_INFO "Address region2 is %x",region2);
+  uint64_t region1_id = addr_to_region_id((uintptr_t) region1);
   uint64_t region2_id = addr_to_region_id((uintptr_t) region2);
-  uint64_t region3_id = addr_to_region_id((uintptr_t) region3);
-  arg->result = sm_region_block(region3_id);
+  arg->result = sm_region_block(region2_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_block FAILED with error code %d\n", arg->result);
     return; 
   }
 
-  arg->result = sm_region_free(region3_id);
+  arg->result = sm_region_free(region2_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_free FAILED with error code %d\n ", arg->result);
     return;
   }
 
-  arg->result = sm_region_metadata_create(region3_id);
+  arg->result = sm_region_metadata_create(region2_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_metadata_create FAILED with error code %d\n",arg->result);
     return; 
@@ -77,34 +75,35 @@ void start_enclave(struct arg_start_enclave *arg)
 
   uint64_t region_metadata_start = sm_region_metadata_start();
   printk(KERN_INFO "Address metadata is %x",region_metadata_start);
-  enclave_id_t enclave_id = ((uintptr_t) region3) + (PAGE_SIZE * region_metadata_start);
+  enclave_id_t enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
   uint64_t num_mailboxes = 1;
+  uint64_t timer_limit = 10000000;
 
-  arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, true);
+  arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, timer_limit, true);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_create FAILED with error code %d\n", arg->result);
     return;
   }
 
-  arg->result = sm_region_block(region2_id);
+  arg->result = sm_region_block(region1_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_block FAILED with error code %d\n", arg->result);
     return;
   }
 
-  arg->result = sm_region_free(region2_id);
+  arg->result = sm_region_free(region1_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_free FAILED with error code %d\n", arg->result);
     return; 
   }
 
-  arg->result = sm_region_assign(region2_id, enclave_id);
+  arg->result = sm_region_assign(region1_id, enclave_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_assign FAILED with error code %d\n", arg->result);
     return; 
   }
 
-  uintptr_t enclave_handler_address = (uintptr_t) region2;
+  uintptr_t enclave_handler_address = (uintptr_t) region1;
   uintptr_t enclave_handler_stack_pointer = enclave_handler_address + HANDLER_LEN + STACK_SIZE;
 
   arg->result = sm_enclave_load_handler(enclave_id, enclave_handler_address);
@@ -114,6 +113,7 @@ void start_enclave(struct arg_start_enclave *arg)
   }
 
   uintptr_t page_table_address = enclave_handler_stack_pointer;
+  printk(KERN_INFO "Enclave Page Table Root is %x",page_table_address);
 
   arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, 0, 3, NODE_ACL);
   if(arg->result != MONITOR_OK) {
@@ -143,9 +143,33 @@ void start_enclave(struct arg_start_enclave *arg)
 
   printk(KERN_INFO "Start loading program\n");
 
-  int num_pages_enclave = (((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE;
+  
+  int num_pages_enclave = ((((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE);
+  
+  if(((((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) % PAGE_SIZE) != 0) {
+    printk(KERN_ALERT "Enclave binary is not page aligned");
+    return;
+  }
+  
+  // Load page table entry for stack
+  uintptr_t entry_stack = 0x200000; 
+  uintptr_t stack_phys_addr = phys_addr;
+  arg->result = sm_enclave_load_page_table(enclave_id, stack_phys_addr, entry_stack - PAGE_SIZE, 0, LEAF_ACL);
+  if(arg->result != MONITOR_OK) {
+    printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
+    return; 
+  }
+
+  phys_addr += PAGE_SIZE;
+  uintptr_t enclave_stack = virtual_addr;
+  printk(KERN_INFO "Enclave Stack Pointer %x\n", enclave_stack);
+  
+  
+
+  uintptr_t entry_pc = virtual_addr;
+  
   int page_count;
-  for(page_count = 0; page_count < num_pages_enclave + 1; page_count++) {
+  for(page_count = 0; page_count < num_pages_enclave; page_count++) {
 
     arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL);
     if(arg->result != MONITOR_OK) {
@@ -153,7 +177,7 @@ void start_enclave(struct arg_start_enclave *arg)
       return; 
     }
 
-    printk(KERN_INFO "Just loaded a page\n");
+    printk(KERN_INFO "Just loaded page %x\n", page_count);
     phys_addr    += PAGE_SIZE;
     os_addr      += PAGE_SIZE;
     virtual_addr += PAGE_SIZE;
@@ -163,8 +187,8 @@ void start_enclave(struct arg_start_enclave *arg)
   uint64_t size_enclave_metadata = sm_enclave_metadata_pages(num_mailboxes);
 
   thread_id_t thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
-  uintptr_t stack_ptr = PAGE_SIZE * (num_pages_enclave + 1) ;
-  arg->result = sm_thread_load(enclave_id, thread_id, 0x0, stack_ptr, enclave_handler_address, enclave_handler_stack_pointer);
+  
+  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, enclave_handler_address, enclave_handler_stack_pointer);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 

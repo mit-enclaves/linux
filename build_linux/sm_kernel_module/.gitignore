@@ -11,3 +11,4 @@ modules.order
 
 # Binary
 a.out
+testenclave

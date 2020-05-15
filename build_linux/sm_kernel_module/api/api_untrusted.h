@@ -4,7 +4,7 @@
 #include "api_types.h"
 #include "api_util.h"
 
-static inline api_result_t sm_enclave_create (enclave_id_t enclave_id, uintptr_t ev_base, uintptr_t ev_mask, uint64_t num_mailboxes,bool debug) {
+static inline api_result_t sm_enclave_create (enclave_id_t enclave_id, uintptr_t ev_base, uintptr_t ev_mask, uint64_t num_mailboxes, uint64_t timer_limit, bool debug) {
   return SM_API_CALL(SM_ENCLAVE_CREATE, enclave_id, ev_base, ev_mask, num_mailboxes, debug, 0);
 }
 
