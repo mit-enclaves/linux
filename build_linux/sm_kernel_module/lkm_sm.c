@@ -29,10 +29,13 @@ MODULE_DESCRIPTION("Security Monitor");
 
 static struct device *security_monitor_dev;
 
+static uintptr_t region1 = 0;
+static uintptr_t region2 = 0;
 void start_enclave(struct arg_start_enclave *arg)
 {
 
   printk(KERN_INFO "Start routine start_enclave");
+  if(region1 ==0 && region2 == 0) {
   dma_addr_t dma_addr;
   void* addr = dma_alloc_coherent(security_monitor_dev, 0x5000000, &dma_addr, GFP_KERNEL);
   if (dma_addr == 0) {
@@ -40,8 +43,6 @@ void start_enclave(struct arg_start_enclave *arg)
     return;
   }
   printk(KERN_INFO "dma addr is %x",dma_addr);
-  uintptr_t region1;
-  uintptr_t region2;
   if ( (unsigned long long) addr % 0x2000000 == 0) {
     region1 = (uintptr_t) dma_addr;
     region2 = (uintptr_t) dma_addr+0x2000000;
@@ -50,10 +51,8 @@ void start_enclave(struct arg_start_enclave *arg)
     region1 = (uintptr_t) aligned_dma_addr;
     region2 = (uintptr_t) aligned_dma_addr+0x2000000;
   }
-
   printk(KERN_INFO "Address region1 is %x",region1);
   printk(KERN_INFO "Address region2 is %x",region2);
-  uint64_t region1_id = addr_to_region_id((uintptr_t) region1);
   uint64_t region2_id = addr_to_region_id((uintptr_t) region2);
   arg->result = sm_region_block(region2_id);
   if(arg->result != MONITOR_OK) {
@@ -72,7 +71,8 @@ void start_enclave(struct arg_start_enclave *arg)
     printk(KERN_ALERT "sm_region_metadata_create FAILED with error code %d\n",arg->result);
     return; 
   }
-
+  }
+  uint64_t region1_id = addr_to_region_id((uintptr_t) region1);
   uint64_t region_metadata_start = sm_region_metadata_start();
   printk(KERN_INFO "Address metadata is %x",region_metadata_start);
   enclave_id_t enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
@@ -200,11 +200,33 @@ void start_enclave(struct arg_start_enclave *arg)
     printk(KERN_ALERT "sm_enclave_init FAILED with error code %d\n", arg->result);
     return; 
   }
-
   printk(KERN_INFO "Enclave enter\n");
   arg->result = sm_enclave_enter(enclave_id, thread_id);
   printk(KERN_INFO "Enclaved finished executing with : %d\n", arg->result); 
-  dma_free_coherent(security_monitor_dev, 0x5000000,  addr, dma_addr);
+
+  arg->result = sm_thread_delete(thread_id);
+  if(arg->result != MONITOR_OK) {
+    printk(KERN_ALERT "sm_thread_delete FAILED with error code %d\n", arg->result);
+    return;
+  }
+
+  printk(KERN_INFO "delete thread\n");
+  arg->result = sm_enclave_delete(enclave_id);
+  if(arg->result != MONITOR_OK) {
+    printk(KERN_ALERT "sm_enclave_delete FAILED with error code %d\n", arg->result);
+    return; 
+  }
+
+  printk(KERN_INFO "delete enclave\n");
+
+  arg->result = sm_region_assign(region1_id, OWNER_UNTRUSTED);
+  if(arg->result != MONITOR_OK) {
+    printk(KERN_ALERT "sm_region_assign FAILED with error code %d\n", arg->result);
+    return; 
+  }
+  printk(KERN_INFO "reassign region to untrusted \n");
+
+  //dma_free_coherent(security_monitor_dev, 0x5000000,  addr, dma_addr);
   return;
 }
 
