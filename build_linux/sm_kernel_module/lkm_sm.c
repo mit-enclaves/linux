@@ -77,9 +77,8 @@ void start_enclave(struct arg_start_enclave *arg)
   printk(KERN_INFO "Address metadata is %x",region_metadata_start);
   enclave_id_t enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
   uint64_t num_mailboxes = 1;
-  uint64_t timer_limit = 10000000;
 
-  arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, timer_limit, true);
+  arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, true);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_create FAILED with error code %d\n", arg->result);
     return;
@@ -104,7 +103,8 @@ void start_enclave(struct arg_start_enclave *arg)
   }
 
   uintptr_t enclave_handler_address = (uintptr_t) region1;
-  uintptr_t enclave_handler_stack_pointer = enclave_handler_address + HANDLER_LEN + STACK_SIZE;
+  uintptr_t page_table_address = enclave_handler_address + HANDLER_LEN + STACK_SIZE;
+  uintptr_t enclave_handler_stack_pointer = page_table_address - INTEGER_CONTEXT_SIZE;
 
   arg->result = sm_enclave_load_handler(enclave_id, enclave_handler_address);
   if(arg->result != MONITOR_OK) {
@@ -112,7 +112,6 @@ void start_enclave(struct arg_start_enclave *arg)
     return; 
   }
 
-  uintptr_t page_table_address = enclave_handler_stack_pointer;
   printk(KERN_INFO "Enclave Page Table Root is %x",page_table_address);
 
   arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, 0, 3, NODE_ACL);
@@ -188,7 +187,9 @@ void start_enclave(struct arg_start_enclave *arg)
 
   thread_id_t thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
   
-  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, enclave_handler_address, enclave_handler_stack_pointer);
+  uint64_t timer_limit = 40000000;
+
+  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, enclave_handler_address, enclave_handler_stack_pointer, timer_limit);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 

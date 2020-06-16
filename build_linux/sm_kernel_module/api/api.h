@@ -52,7 +52,7 @@ api_result_t sm_enclave_delete (enclave_id_t enclave_id);
 api_result_t sm_enclave_enter (enclave_id_t enclave_id, thread_id_t thread_id, uintptr_t *regs); // TODO rename the handles etc...
 
 // Ends the currently running enclave thread and returns control to the OS.
-api_result_t sm_enclave_exit(void);
+api_result_t sm_enclave_exit (void);
 
 // Marks the given enclave as initialized and ready to execute.
 //
@@ -263,6 +263,10 @@ api_result_t sm_thread_delete (thread_id_t thread_id);
 // addresses in the enclave's address space. They are used to set the
 // corresponding fields in thread_init_info_t.
 //
+// 'timer_limit' is the maximum number of timer interupts and enclave can 
+// receive before performing an AEX. Any unsigned integer is a valid 
+// timer_limit
+//
 // This must be called after the enclave's root page table is set by a call to
 // load_page_table().
 api_result_t sm_thread_load (
@@ -271,7 +275,8 @@ api_result_t sm_thread_load (
   uintptr_t entry_pc,
   uintptr_t entry_stack,
   uintptr_t fault_pc,
-  uintptr_t fault_stack);
+  uintptr_t fault_stack,
+  uint64_t timer_limit);
 
 // Returns the number of pages used by a thread metadata structure.
 uint64_t sm_thread_metadata_pages(void);
