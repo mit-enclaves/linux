@@ -77,7 +77,6 @@ $(BUILD_DIR)/%.lds : %.lds.in
 
 # Platform Sources
 ALL_TESTS_SRC := \
-	$(PLATFORM_DIR)/htif.c \
 	$(PLATFORM_DIR)/sm_keys.c \
 	$(PLATFORM_DIR)/sm.S \
 	$(PLATFORM_DIR)/idpt.S \
