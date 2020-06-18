@@ -2,6 +2,12 @@
 # Assumes: $(SANCTUM_QEMU)
 # Assumes: $(VMLINUX)
 
+SANCTUM_QEMU ?= qemu
+SM_BUILD_DIR ?= ../security_monitor/build
+VMLINUX ?= $(BUILD_LINUX_DIR)/riscv-linux/vmlinux
+
+all: test_linux 
+
 # Find the Root Directory
 RUN_LINUX_DIR:=$(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
@@ -9,7 +15,7 @@ RUN_LINUX_DIR:=$(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 PYTHON=python
 CC=riscv64-unknown-elf-gcc
 
-LINUX_OBJCOPY=riscv64-linux-gnu-objcopy
+LINUX_OBJCOPY=riscv64-unknown-linux-gnu-objcopy
 
 # Flags
 DEBUG_FLAGS := -ggdb3
@@ -92,8 +98,6 @@ $(BUILD_DIR)/test_linux.elf: check_bin_env $(SM_TEST_LD) $(BUILD_DIR) $(SM_BINAR
 	-D SM_BINARY_FILE=\"$(SM_BINARY)\" \
 	-D LINUX_FILE=\"$(LINUX_BIN)\" \
 	-o $@
-
-all: test_linux 
 
 .PHONY: test_linux
 test_linux: $(BUILD_DIR)/test_linux.elf
