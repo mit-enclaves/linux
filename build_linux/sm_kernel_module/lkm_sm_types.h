@@ -19,6 +19,6 @@ struct arg_sm_region_metadata_start {void;};
 struct arg_sm_region_owner { region_id_t id;};
 struct arg_sm_region_state { region_id_t id;};
 struct arg_sm_thread_delete { thread_id_t thread_id;};
-struct arg_sm_thread_load { enclave_id_t enclave_id; thread_id_t thread_id; uintptr_t entry_pc; uintptr_t entry_stack; uintptr_t fault_pc; uintptr_t fault_stack;};
+struct arg_sm_thread_load { enclave_id_t enclave_id; thread_id_t thread_id; uintptr_t entry_pc; uintptr_t entry_stack;};
 struct arg_sm_thread_metadata_pages {void;};
 

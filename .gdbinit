@@ -7,11 +7,9 @@ set logging on
 target remote localhost:1234
 symbol-file build_linux/riscv-linux/vmlinux
 add-symbol-file ../security_monitor/build/sm.elf 0x80003000
-add-symbol-file ../security_monitor/build/sm.enclave.elf 0xf8000000
+add-symbol-file ../security_monitor/build/sm.enclave.elf 0xf8001000
 add-symbol-file ../AES_enclave/build/enclave.elf 0x0
 set directories /home/drean/Research/mit-enclaves/linux/build_linux/riscv-linux:$cdir:$cwd
-#add-symbol-file build/master_test.elf 0x82000000
-#add-symbol-file build/sm.enclave.elf  0x86000000
-#add-symbol-file build/enclave.elf     0x0
-b *0x0
+#b *0x0
 b sm_internal_perform_enclave_exit
+b sm_internal_enclave_enter

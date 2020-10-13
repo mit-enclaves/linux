@@ -103,8 +103,7 @@ void start_enclave(struct arg_start_enclave *arg)
   }
 
   uintptr_t enclave_handler_address = (uintptr_t) region1;
-  uintptr_t page_table_address = enclave_handler_address + HANDLER_LEN + STACK_SIZE;
-  uintptr_t enclave_handler_stack_pointer = page_table_address - INTEGER_CONTEXT_SIZE;
+  uintptr_t page_table_address = enclave_handler_address + (STACK_SIZE * NUM_CORES) + HANDLER_LEN;
 
   arg->result = sm_enclave_load_handler(enclave_id, enclave_handler_address);
   if(arg->result != MONITOR_OK) {
@@ -189,7 +188,7 @@ void start_enclave(struct arg_start_enclave *arg)
   
   uint64_t timer_limit = 40000000;
 
-  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, enclave_handler_address, enclave_handler_stack_pointer, timer_limit);
+  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, timer_limit);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 
