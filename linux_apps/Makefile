@@ -1,7 +1,7 @@
 API_DIR:=../../security_monitor/api
 # Assumes: $(API_DIR)
 
-CC=riscv64-linux-gnu-gcc
+CC=riscv64-unknown-linux-gnu-gcc
 
 LINUX_APPS_INCLUDES := \
 	$(API_DIR) \

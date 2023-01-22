@@ -1,7 +1,6 @@
 #!/bin/ash
 
-echo hello > /dev/ttyS0
+echo "Hello World!" > /dev/console
 insmod /test/lkm_sm.ko
-mknod /dev/security_monitor c 10 58
+mknod /dev/security_monitor c 10 127
 ./test/testenclave
-echo world > /dev/console

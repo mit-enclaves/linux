@@ -28,7 +28,7 @@
 
   to build the default vmlinux. At the moment it requires to first build the sm kernel module
   In order to do so, go in build_linix/sm_kernel_module
-  run 'make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu-'
+  run 'make ARCH=riscv CROSS_COMPILE=riscv64-unknown-linux-gnu-'
   then 'make test'
 
 ### test_linux

@@ -32,23 +32,23 @@ int main()
   int fd, ret = 0;
   struct arg_start_enclave val;
   fd = open("/dev/security_monitor", O_RDWR);
-  printf("file descriptor fd(%d)", fd);
+  printf("file descriptor fd(%d)\n", fd);
   if (fd < 0) {
-     printf("File open error\n");
+     printf("File open error with errno %d\n", errno);
      return -errno;
   }
 
   FILE *ptr;
   ptr = fopen("/test/enclave.bin","rb");
   long int sizefile = size_file("/test/enclave.bin");
-  printf("Size enclave.bin (%d)\n", sizefile);
+  printf("Size enclave.bin (%ld)\n", sizefile);
   char* enclave = memalign(1<<12,sizefile);
   size_t sizecopied;
   sizecopied = fread(enclave, sizefile, 1, ptr);
-  printf("Size copied: %d", sizecopied);
+  printf("Size copied: %ld\n", sizecopied);
   int iterateword;
   for (iterateword = 0; iterateword < 20; iterateword++) {
-      printf("In user space: %x", *(((unsigned int*) enclave)+ iterateword));
+      printf("In user space: %x\n", *(((unsigned int*) enclave)+ iterateword));
   }
 
   fclose(ptr);
@@ -60,7 +60,7 @@ int main()
     perror("Shared memory not allocated in a correct place, last errno: ");
     exit(-1);
   }
-  printf("Address for the shared enclave %x", shared_enclave);
+  printf("Address for the shared enclave %p\n", shared_enclave);
   strcpy(shared_enclave, "A small test");
   val.enclave_start = (long)enclave;
   val.enclave_end = (long)(enclave + sizefile);
@@ -69,9 +69,9 @@ int main()
   ret = ioctl(fd, IOCTL_START_ENCLAVE, &val);
   printf("ioctl ret val (%d) errno (%d)\n", ret, errno);
   if (ret == 0) {
-    printf("Received from enclave: %s", shared_enclave); 
+    printf("Received from enclave: %s\n", (char *) shared_enclave); 
   }
   fflush(stdout);
-  perror("IOCTL error: ");
+  //perror("IOCTL error: ");
   close(fd);
 }

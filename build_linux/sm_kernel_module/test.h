@@ -5,7 +5,7 @@
 
 void test_entry (void)  __attribute__((noreturn));
 
-#define PAGE_SIZE (1<<PAGE_SHIFT)
+// #define PAGE_SIZE (1<<PAGE_SHIFT) // Already defined by Linux
 #define REGION_SIZE (1<<REGION_SHIFT)
 #define REGION_MASK (~(REGION_SIZE-1))
 

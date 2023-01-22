@@ -259,7 +259,7 @@ api_result_t sm_thread_delete (thread_id_t thread_id);
 // ID used for subsequent API calls. The required number of free metadata pages
 // can be obtained by calling `thread_metadata_pages`.
 //
-// `entry_pc`, `entry_stack`, are virtual
+// `entry_pc`, `entry_stack` are virtual
 // addresses in the enclave's address space. They are used to set the
 // corresponding fields in thread_init_info_t.
 //

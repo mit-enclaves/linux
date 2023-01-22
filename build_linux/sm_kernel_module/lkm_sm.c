@@ -33,6 +33,16 @@ static uintptr_t region1 = 0;
 static uintptr_t region2 = 0;
 void start_enclave(struct arg_start_enclave *arg)
 {
+  uint64_t region2_id, region1_id;
+  enclave_id_t enclave_id;
+  uintptr_t enclave_handler_address;
+  uintptr_t page_table_address;
+  uint64_t region_metadata_start, num_mailboxes;
+  uintptr_t phys_addr, os_addr, virtual_addr;
+  int num_pages_enclave, page_count;
+  uintptr_t entry_stack, stack_phys_addr, enclave_stack, entry_pc;
+  uint64_t size_enclave_metadata, timer_limit;
+  thread_id_t thread_id;
 
   printk(KERN_INFO "Start routine start_enclave");
   if(region1 ==0 && region2 == 0) {
@@ -42,7 +52,7 @@ void start_enclave(struct arg_start_enclave *arg)
     printk(KERN_ALERT "Error allocation");
     return;
   }
-  printk(KERN_INFO "dma addr is %x",dma_addr);
+  printk(KERN_INFO "dma addr is %llx",dma_addr);
   if ( (unsigned long long) addr % 0x2000000 == 0) {
     region1 = (uintptr_t) dma_addr;
     region2 = (uintptr_t) dma_addr+0x2000000;
@@ -51,9 +61,9 @@ void start_enclave(struct arg_start_enclave *arg)
     region1 = (uintptr_t) aligned_dma_addr;
     region2 = (uintptr_t) aligned_dma_addr+0x2000000;
   }
-  printk(KERN_INFO "Address region1 is %x",region1);
-  printk(KERN_INFO "Address region2 is %x",region2);
-  uint64_t region2_id = addr_to_region_id((uintptr_t) region2);
+  printk(KERN_INFO "Address region1 is %lx",region1);
+  printk(KERN_INFO "Address region2 is %lx",region2);
+  region2_id = addr_to_region_id((uintptr_t) region2);
   arg->result = sm_region_block(region2_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_block FAILED with error code %d\n", arg->result);
@@ -72,11 +82,11 @@ void start_enclave(struct arg_start_enclave *arg)
     return; 
   }
   }
-  uint64_t region1_id = addr_to_region_id((uintptr_t) region1);
-  uint64_t region_metadata_start = sm_region_metadata_start();
-  printk(KERN_INFO "Address metadata is %x",region_metadata_start);
-  enclave_id_t enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
-  uint64_t num_mailboxes = 1;
+  region1_id = addr_to_region_id((uintptr_t) region1);
+  region_metadata_start = sm_region_metadata_start();
+  printk(KERN_INFO "Address metadata is %llx",region_metadata_start);
+  enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
+  num_mailboxes = 1;
 
   arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, true);
   if(arg->result != MONITOR_OK) {
@@ -102,8 +112,8 @@ void start_enclave(struct arg_start_enclave *arg)
     return; 
   }
 
-  uintptr_t enclave_handler_address = (uintptr_t) region1;
-  uintptr_t page_table_address = enclave_handler_address + (STACK_SIZE * NUM_CORES) + HANDLER_LEN;
+  enclave_handler_address = (uintptr_t) region1;
+  page_table_address = enclave_handler_address + (STACK_SIZE * NUM_CORES) + HANDLER_LEN;
 
   arg->result = sm_enclave_load_handler(enclave_id, enclave_handler_address);
   if(arg->result != MONITOR_OK) {
@@ -111,7 +121,7 @@ void start_enclave(struct arg_start_enclave *arg)
     return; 
   }
 
-  printk(KERN_INFO "Enclave Page Table Root is %x",page_table_address);
+  printk(KERN_INFO "Enclave Page Table Root is %lx",page_table_address);
 
   arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, 0, 3, NODE_ACL);
   if(arg->result != MONITOR_OK) {
@@ -135,14 +145,13 @@ void start_enclave(struct arg_start_enclave *arg)
     return; 
   }
 
-  uintptr_t phys_addr = page_table_address + PAGE_SIZE;
-  uintptr_t os_addr = (uintptr_t) arg->enclave_start;
-  uintptr_t virtual_addr = 0;
+  phys_addr = page_table_address + PAGE_SIZE;
+  os_addr = (uintptr_t) arg->enclave_start;
+  virtual_addr = 0;
 
   printk(KERN_INFO "Start loading program\n");
 
-  
-  int num_pages_enclave = ((((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE);
+  num_pages_enclave = ((((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE);
   
   if(((((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) % PAGE_SIZE) != 0) {
     printk(KERN_ALERT "Enclave binary is not page aligned");
@@ -150,8 +159,8 @@ void start_enclave(struct arg_start_enclave *arg)
   }
   
   // Load page table entry for stack
-  uintptr_t entry_stack = 0x200000; 
-  uintptr_t stack_phys_addr = phys_addr;
+  entry_stack = 0x200000; 
+  stack_phys_addr = phys_addr;
   arg->result = sm_enclave_load_page_table(enclave_id, stack_phys_addr, entry_stack - PAGE_SIZE, 0, LEAF_ACL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
@@ -159,14 +168,11 @@ void start_enclave(struct arg_start_enclave *arg)
   }
 
   phys_addr += PAGE_SIZE;
-  uintptr_t enclave_stack = virtual_addr;
-  printk(KERN_INFO "Enclave Stack Pointer %x\n", enclave_stack);
+  enclave_stack = virtual_addr;
+  printk(KERN_INFO "Enclave Stack Pointer %lx\n", enclave_stack);
   
+  entry_pc = virtual_addr;
   
-
-  uintptr_t entry_pc = virtual_addr;
-  
-  int page_count;
   for(page_count = 0; page_count < num_pages_enclave; page_count++) {
 
     arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL);
@@ -182,11 +188,11 @@ void start_enclave(struct arg_start_enclave *arg)
 
   }
 
-  uint64_t size_enclave_metadata = sm_enclave_metadata_pages(num_mailboxes);
+  size_enclave_metadata = sm_enclave_metadata_pages(num_mailboxes);
 
-  thread_id_t thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
+  thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
   
-  uint64_t timer_limit = 40000000;
+  timer_limit = 40000000;
 
   arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, timer_limit);
   if(arg->result != MONITOR_OK) {
@@ -256,8 +262,11 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
         //local_irq_disable();
 
-        unsigned long bytes_from_user;
-        unsigned long bytes_to_user;
+        unsigned long bytes_from_user, bytes_to_user;
+        dma_addr_t dma_addr;
+        size_t size_enclave;
+        void* addr;
+        int iterateword;
 
         struct arg_start_enclave arg_struct;
          switch(cmd) {
@@ -267,21 +276,19 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                                 printk(KERN_ALERT "Error while trying to copy argument from user space to kernel space\n" );
                         }
 
-                        dma_addr_t dma_addr;
-                        size_t size_enclave =  arg_struct.enclave_end - arg_struct.enclave_start;
+                        size_enclave =  arg_struct.enclave_end - arg_struct.enclave_start;
 
                         printk(KERN_INFO "Allocate physical memory for binary image\n");
-                        void* addr = dma_alloc_coherent(security_monitor_dev, size_enclave, &dma_addr, GFP_KERNEL);
+                        addr = dma_alloc_coherent(security_monitor_dev, size_enclave, &dma_addr, GFP_KERNEL);
                         if (addr == 0) {
                           printk(KERN_ALERT "Error dma allocation");
-                          return (int)addr;
+                          return (long int)addr;
                         }
                         printk(KERN_INFO "Copy image from user\n");
                         bytes_from_user = copy_from_user(addr, (char*) arg_struct.enclave_start, size_enclave);
                         if (bytes_from_user != 0) {
                                 printk(KERN_ALERT "Error while trying to copy argument from user space to kernel space\n" );
                         }
-                        int iterateword;
                         for (iterateword = 0; iterateword < 20; iterateword++) {
                             printk(KERN_INFO "In kernel space: %x", *(((unsigned int*) addr)+ iterateword));
                         }
@@ -316,8 +323,8 @@ static int __init sm_mod_init(void)
 
   ret_val = misc_register(&security_monitor_misc);
   if (unlikely(ret_val)) {
-  	pr_err("failed to register security monitor misc device!\n");
-  	return ret_val;
+    pr_err("failed to register security monitor misc device!\n");
+    return ret_val;
   }
   security_monitor_dev = security_monitor_misc.this_device;
   security_monitor_dev->coherent_dma_mask = ~0;

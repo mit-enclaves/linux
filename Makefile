@@ -9,7 +9,7 @@ RUN_LINUX_DIR:=$(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 PYTHON=python
 CC=riscv64-unknown-elf-gcc
 
-LINUX_OBJCOPY=riscv64-linux-gnu-objcopy
+LINUX_OBJCOPY=riscv64-unknown-linux-gnu-objcopy
 
 # Flags
 DEBUG_FLAGS := -ggdb3
@@ -23,7 +23,7 @@ ifndef SANCTUM_QEMU
 	$(error SANCTUM_QEMU is undefined)
 endif
 
-QEMU_FLAGS= -machine sanctum -m 2G -nographic
+QEMU_FLAGS= -smp cpus=2 -machine sanctum -m 2G -nographic
 DEBUG_QEMU_FLAGS= -S -s
 
 # Define Directories

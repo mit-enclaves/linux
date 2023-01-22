@@ -47,7 +47,7 @@ if test_dir != '':
         writeTree('/test', sm_kernel)
 
 # compile vmlinux
-cmd = 'cd {}; make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- -j{}'.format(linux_dir, args.jobs)
-print 'Running: {}'.format(cmd)
+cmd = 'cd {}; make ARCH=riscv CROSS_COMPILE=riscv64-unknown-linux-gnu- -j{}'.format(linux_dir, args.jobs)
+print('Running: {}'.format(cmd))
 subprocess.check_call(cmd, shell = True)
 
