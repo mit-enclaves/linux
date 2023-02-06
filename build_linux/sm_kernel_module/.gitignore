@@ -3,6 +3,7 @@
 *.ko
 *.cmd
 *.mod.c
+*.mod
 
 # Arctefacts
 .tmp_versions
@@ -12,3 +13,4 @@ modules.order
 # Binary
 a.out
 testenclave
+

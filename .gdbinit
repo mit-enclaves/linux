@@ -9,5 +9,5 @@ symbol-file build_linux/riscv-linux/vmlinux
 add-symbol-file build_linux/riscv-linux/vmlinux 0x82000000
 add-symbol-file ../secure_shared_memory/build/sm.elf 0x80000000
 add-symbol-file ../secure_shared_memory/build/sm.enclave.elf 0xf8001000
-add-symbol-file /mnt/efs/fs1/micropython/ports/bare-riscv/build/firmware.elf 0x0
+add-symbol-file /mnt/efs/fs1/secure_shared_memory/build/crypto_enclave.elf 0x20000000
 set directories /home/drean/Research/mit-enclaves/linux/build_linux/riscv-linux:$cdir:$cwd

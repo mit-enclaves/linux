@@ -18,6 +18,8 @@
 
 #include "test.h"
 
+#define EVBASE 0x20000000
+
 struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; uintptr_t shared_memory; };
 #define MAJOR_NUM 's'
 #define IOCTL_START_ENCLAVE _IOR(MAJOR_NUM, 0x1, struct arg_stat_enclave*)
@@ -88,7 +90,7 @@ void start_enclave(struct arg_start_enclave *arg)
   enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
   num_mailboxes = 1;
 
-  arg->result = sm_enclave_create(enclave_id, 0x0, ~0xFFFFFF/*REGION_MASK*/, num_mailboxes, true);
+  arg->result = sm_enclave_create(enclave_id, EVBASE, REGION_MASK, num_mailboxes, true);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_create FAILED with error code %d\n", arg->result);
     return;
@@ -123,7 +125,7 @@ void start_enclave(struct arg_start_enclave *arg)
 
   printk(KERN_INFO "Enclave Page Table Root is %lx",page_table_address);
 
-  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, 0, 3, NODE_ACL);
+  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 3, NODE_ACL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
     return; 
@@ -131,7 +133,7 @@ void start_enclave(struct arg_start_enclave *arg)
 
   page_table_address += PAGE_SIZE;
 
-  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, 0, 2, NODE_ACL);
+  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 2, NODE_ACL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
     return; 
@@ -139,7 +141,7 @@ void start_enclave(struct arg_start_enclave *arg)
 
   page_table_address += PAGE_SIZE;
 
-  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, 0, 1, NODE_ACL);
+  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 1, NODE_ACL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
     return; 
@@ -147,7 +149,7 @@ void start_enclave(struct arg_start_enclave *arg)
 
   phys_addr = page_table_address + PAGE_SIZE;
   os_addr = (uintptr_t) arg->enclave_start;
-  virtual_addr = 0;
+  virtual_addr = EVBASE;
 
   printk(KERN_INFO "Start loading program\n");
 
@@ -179,7 +181,7 @@ void start_enclave(struct arg_start_enclave *arg)
   
   timer_limit = 0x40000000;
   
-  entry_pc = 0;
+  entry_pc = EVBASE;
 
   arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, arg->shared_memory, timer_limit);
   if(arg->result != MONITOR_OK) {

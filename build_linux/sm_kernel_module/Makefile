@@ -5,8 +5,10 @@ all: testenclave lkm_sm.ko
 lkm_sm.ko: lkm_sm.c
 	make -C ../riscv-linux M=$(PWD)
 
-testenclave: test.c
-	$(CROSS_COMPILE)gcc -g -O -static -march=rv64g -o $@ test.c
+TEST_SRC := test.c inputs.c crypto_enclave_api.c msgq/msgq.c
+
+testenclave: $(TEST_SRC) 
+	$(CROSS_COMPILE)gcc -g -O -static -march=rv64g -o $@ $(TEST_SRC)
 
 modulesclean:
 	make -C ../riscv-linux M=$(PWD) clean
