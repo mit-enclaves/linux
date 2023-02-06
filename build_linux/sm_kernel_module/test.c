@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; };
+struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; uintptr_t shared_memory; };
 #define MAJOR_NUM 's'
 #define IOCTL_START_ENCLAVE _IOR(MAJOR_NUM, 0x1, struct run_enclave*)
 
@@ -53,15 +53,17 @@ int main()
 
   fclose(ptr);
   /* Allocate memory to share with the enclave. Need to find a proper place for that */
-  #define begin_shared 0xF000000
+  #define begin_shared 0x8a000000
   #define shared_size 0x1000
   void* shared_enclave = mmap((void *)begin_shared, shared_size, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0); // 
   if (shared_enclave == MAP_FAILED) {
     perror("Shared memory not allocated in a correct place, last errno: ");
     exit(-1);
   }
-  printf("Address for the shared enclave %p\n", shared_enclave);
+  printf("Address for the shared memory with the enclave %p\n", shared_enclave);
   strcpy(shared_enclave, "A small test");
+  printf("Right now in shared memory: %s\n", (char *) shared_enclave); 
+  val.shared_memory = (long) shared_enclave;
   val.enclave_start = (long)enclave;
   val.enclave_end = (long)(enclave + sizefile);
   printf("Sending ioctl CMD 2\n");

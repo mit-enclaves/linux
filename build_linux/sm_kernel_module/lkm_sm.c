@@ -18,7 +18,7 @@
 
 #include "test.h"
 
-struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; };
+struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; uintptr_t shared_memory; };
 #define MAJOR_NUM 's'
 #define IOCTL_START_ENCLAVE _IOR(MAJOR_NUM, 0x1, struct arg_stat_enclave*)
 
@@ -40,7 +40,7 @@ void start_enclave(struct arg_start_enclave *arg)
   uint64_t region_metadata_start, num_mailboxes;
   uintptr_t phys_addr, os_addr, virtual_addr;
   int num_pages_enclave, page_count;
-  uintptr_t entry_stack, stack_phys_addr, enclave_stack, entry_pc;
+  uintptr_t entry_pc;
   uint64_t size_enclave_metadata, timer_limit;
   thread_id_t thread_id;
 
@@ -158,21 +158,6 @@ void start_enclave(struct arg_start_enclave *arg)
     return;
   }
   
-  // Load page table entry for stack
-  entry_stack = 0x200000; 
-  stack_phys_addr = phys_addr;
-  arg->result = sm_enclave_load_page_table(enclave_id, stack_phys_addr, entry_stack - PAGE_SIZE, 0, LEAF_ACL);
-  if(arg->result != MONITOR_OK) {
-    printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
-    return; 
-  }
-
-  phys_addr += PAGE_SIZE;
-  enclave_stack = virtual_addr;
-  printk(KERN_INFO "Enclave Stack Pointer %lx\n", enclave_stack);
-  
-  entry_pc = virtual_addr;
-  
   for(page_count = 0; page_count < num_pages_enclave; page_count++) {
 
     arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL);
@@ -192,9 +177,11 @@ void start_enclave(struct arg_start_enclave *arg)
 
   thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
   
-  timer_limit = 40000000;
+  timer_limit = 0x40000000;
+  
+  entry_pc = 0;
 
-  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, entry_stack, timer_limit);
+  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, arg->shared_memory, timer_limit);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 
@@ -264,7 +251,7 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
         unsigned long bytes_from_user, bytes_to_user;
         dma_addr_t dma_addr;
-        size_t size_enclave;
+        size_t size_enclave, padded_size_enclave, size_padding;
         void* addr;
         int iterateword;
 
@@ -277,23 +264,31 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         }
 
                         size_enclave =  arg_struct.enclave_end - arg_struct.enclave_start;
+                        //padded_size_enclave = ((size_enclave % PAGE_SIZE) == 0) ? size_enclave, ((size_enclave / PAGE_SIZE) + 1) * PAGE_SIZE;
+                        padded_size_enclave = 0x40000;
+                        size_padding = padded_size_enclave - size_enclave;
 
                         printk(KERN_INFO "Allocate physical memory for binary image\n");
-                        addr = dma_alloc_coherent(security_monitor_dev, size_enclave, &dma_addr, GFP_KERNEL);
+                        addr = dma_alloc_coherent(security_monitor_dev, padded_size_enclave, &dma_addr, GFP_KERNEL);
                         if (addr == 0) {
                           printk(KERN_ALERT "Error dma allocation");
                           return (long int)addr;
                         }
                         printk(KERN_INFO "Copy image from user\n");
                         bytes_from_user = copy_from_user(addr, (char*) arg_struct.enclave_start, size_enclave);
+
                         if (bytes_from_user != 0) {
                                 printk(KERN_ALERT "Error while trying to copy argument from user space to kernel space\n" );
                         }
                         for (iterateword = 0; iterateword < 20; iterateword++) {
                             printk(KERN_INFO "In kernel space: %x", *(((unsigned int*) addr)+ iterateword));
                         }
+                        
+                        // Pad the enclave's binary with 0
+                        memset(addr + size_enclave, 0x0, size_padding);
+
                         arg_struct.enclave_start = dma_addr;
-                        arg_struct.enclave_end = dma_addr + size_enclave;
+                        arg_struct.enclave_end = dma_addr + padded_size_enclave;
                         printk(KERN_INFO "Start enclave\n");
                         start_enclave(&arg_struct);
                         printk(KERN_INFO "Free physical memory for binary image\n");
