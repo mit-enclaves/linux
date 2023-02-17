@@ -1,4 +1,0 @@
-[submodule "riscv-linux"]
-	path = build_linux/riscv-linux
-	url = git@github.com:mit-enclaves/riscv-linux.git
-	branch = riscv-linux-4.20
