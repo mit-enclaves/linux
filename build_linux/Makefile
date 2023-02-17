@@ -13,4 +13,4 @@ include $(TERMINATE_DIR)/Makefile
 # Build Linux
 .PHONY: build_linux
 build_linux: $(BUSYBOX) $(TERMINATE)
-	python $(BUILD_LINUX_DIR)/build-linux.py
+	python $(BUILD_LINUX_DIR)/build-linux.py --jobs 16
