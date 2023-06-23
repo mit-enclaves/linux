@@ -1,4 +1,8 @@
-# build linux
+# Linux Building Tools And Security Monitor Kernel Module
+
+This repository contains tools and scripts to compile Linux to run on Citadel. It also contains the code for the SM Kernel Module to enable Linux to interract with the Security Monitor and allow applications to launch secure enclaves.
+
+# Build Linux
 
 ## Global Variable:
 
