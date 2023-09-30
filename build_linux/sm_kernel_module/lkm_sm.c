@@ -46,7 +46,7 @@ void start_enclave(struct arg_start_enclave *arg)
   uint64_t size_enclave_metadata, timer_limit;
   thread_id_t thread_id;
 
-  printk(KERN_INFO "Start routine start_enclave");
+  printk(KERN_INFO "Start routine to launch the enclave");
   if(region1 ==0 && region2 == 0) {
   dma_addr_t dma_addr;
   void* addr = dma_alloc_coherent(security_monitor_dev, 0x5000000, &dma_addr, GFP_KERNEL);
@@ -54,7 +54,7 @@ void start_enclave(struct arg_start_enclave *arg)
     printk(KERN_ALERT "Error allocation");
     return;
   }
-  printk(KERN_INFO "dma addr is %llx",dma_addr);
+  printk(KERN_INFO "DMA addr is %llx",dma_addr);
   if ( (unsigned long long) addr % 0x2000000 == 0) {
     region1 = (uintptr_t) dma_addr;
     region2 = (uintptr_t) dma_addr+0x2000000;
@@ -183,13 +183,14 @@ void start_enclave(struct arg_start_enclave *arg)
   
   entry_pc = EVBASE;
 
+  printk(KERN_INFO "Assign thread to enclave\n");
   arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, arg->shared_memory, timer_limit);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 
   }
 
-  printk(KERN_INFO "Enclave init\n");
+  printk(KERN_INFO "Enclave sealing\n");
   arg->result = sm_enclave_init(enclave_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_init FAILED with error code %d\n", arg->result);
@@ -197,29 +198,28 @@ void start_enclave(struct arg_start_enclave *arg)
   }
   printk(KERN_INFO "Enclave enter\n");
   arg->result = sm_enclave_enter(enclave_id, thread_id);
-  printk(KERN_INFO "Enclaved finished executing with : %d\n", arg->result); 
+  printk(KERN_INFO "Enclave exited\n"); 
 
+  printk(KERN_INFO "Delete thread metadata\n");
   arg->result = sm_thread_delete(thread_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_delete FAILED with error code %d\n", arg->result);
     return;
   }
 
-  printk(KERN_INFO "delete thread\n");
+  printk(KERN_INFO "Delete enclave metadata\n");
   arg->result = sm_enclave_delete(enclave_id);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_delete FAILED with error code %d\n", arg->result);
     return; 
   }
 
-  printk(KERN_INFO "delete enclave\n");
-
+  printk(KERN_INFO "Reassign DRAM region to untrusted \n");
   arg->result = sm_region_assign(region1_id, OWNER_UNTRUSTED);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_assign FAILED with error code %d\n", arg->result);
     return; 
   }
-  printk(KERN_INFO "reassign region to untrusted \n");
 
   //dma_free_coherent(security_monitor_dev, 0x5000000,  addr, dma_addr);
   return;
@@ -270,7 +270,7 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         padded_size_enclave = 0x40000;
                         size_padding = padded_size_enclave - size_enclave;
 
-                        printk(KERN_INFO "Allocate physical memory for binary image\n");
+                        printk(KERN_INFO "Allocate physical memory for the enclave binary image\n");
                         addr = dma_alloc_coherent(security_monitor_dev, padded_size_enclave, &dma_addr, GFP_KERNEL);
                         if (addr == 0) {
                           printk(KERN_ALERT "Error dma allocation");
@@ -301,8 +301,8 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         }
                         break;
         }
-        //local_irq_enable();
-        printk(KERN_INFO "renable timer interrupts\n");
+        local_irq_enable();
+        printk(KERN_INFO "Renable interrupts\n");
         return 0;
 }
 
@@ -311,7 +311,7 @@ static int __init sm_mod_init(void)
 {
   int region;
   int ret_val;
-  printk(KERN_INFO "Kernel module try to do some enclave stuff!\n");
+  printk(KERN_INFO "Initializing the SM Kernel Module\n");
 
   for(region = 0; region < 64; region++) {
     int result = sm_region_owner(region);

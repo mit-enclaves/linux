@@ -41,7 +41,7 @@ int main()
   int fd, ret = 0;
   struct arg_start_enclave val;
   fd = open("/dev/security_monitor", O_RDWR);
-  printf("file descriptor fd(%d)\n", fd);
+  printf("File descriptor fd(%d)\n", fd);
   if (fd < 0) {
     printf("File open error with errno %d\n", errno);
     return -errno;
@@ -54,13 +54,8 @@ int main()
   char* enclave = memalign(1<<12,sizefile);
   size_t sizecopied;
   sizecopied = fread(enclave, sizefile, 1, ptr);
-  printf("Size copied: %ld\n", sizecopied);
-  int iterateword;
-  for (iterateword = 0; iterateword < 20; iterateword++) {
-    printf("In user space: %x\n", *(((unsigned int*) enclave)+ iterateword));
-  }
-
   fclose(ptr);
+  
   /* Allocate memory to share with the enclave. Need to find a proper place for that */
 #define shared_size 0x10000
   void* shared_memory = mmap((void *)SHARED_MEM_REG, shared_size, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
@@ -87,6 +82,7 @@ int main()
     exit(-1);
   }
   
+  printf("Creating RPC for the enclave");
   // Enqueue requests for enclave
   mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
 
@@ -95,11 +91,9 @@ int main()
   public_key_t *pk = &mem->pk;
   signature_t *s = &mem->s;
 
-  printf("pk is stored at address %lx\n", pk);
-
-  printf("Creat SK\n");
+  printf("[RPC] Create SK\n");
   create_signing_key_pair(NULL, &key_id);
-  printf("Creat PK\n");
+  printf("[RPC] Create PK\n");
   get_public_signing_key(key_id, pk);
 
   msg_t *m; 
@@ -111,35 +105,33 @@ int main()
 
   strncpy(mem->in_msg, "Hello World!", MSG_LEN);
 
-  printf("Sign\n");
+  printf("[RPC] Sign\n");
 #define N 1
   for(int i = 0; i < N; i++) {
     sign(mem->in_msg, MSG_LEN, key_id, s); 
   }   
 
-  printf("Verify SK\n");
+  printf("[RPC] Verify SK\n");
   verify(s, mem->in_msg, MSG_LEN, pk);
 
-  printf("Send Enclave Exit\n");
+  printf("[RPC] Enclave Exit\n");
   enclave_exit();
   
-  printf("Done sending RPC\n");
+  printf("Done creating RPC\n");
 
   //printf("Right now in shared memory: %s\n", (char *) shared_memory); 
   val.shared_memory = (long) shared_memory;
   val.enclave_start = (long)enclave;
-  printf("enclave start address %lx/n", enclave);
   val.enclave_end = (long)(enclave + sizefile);
-  printf("enclave end address %lx/n", val.enclave_end);
-  printf("Sending ioctl CMD 2\n");
+  printf("Asking the SM Kernel Module to launch the enclave.\n");
   fflush(stdout);
   ret = ioctl(fd, IOCTL_START_ENCLAVE, &val);
-  printf("ioctl ret val (%d) errno (%d)\n", ret, errno);
+  printf("SM Kernel Module returned with val (%d) errno (%d)\n", ret, errno);
   if (ret == 0) {
     do {
       res = pop(qresp, (void **) &m);
       if((res == 0) && (m->f == F_VERIFY)) {
-        printf("result %d\n", m->ret);
+        printf("Return value from Verify RPC: %d\n", m->ret);
       }
     } while((res != 0) || (m->f != F_EXIT));
   }
