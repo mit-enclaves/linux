@@ -62,13 +62,22 @@ int main()
 
   fclose(ptr);
   /* Allocate memory to share with the enclave. Need to find a proper place for that */
-#define shared_size 0x1000
-  void* shared_enclave = mmap((void *)SHARED_MEM_REG, shared_size, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-  if (shared_enclave == MAP_FAILED) {
+#define shared_size 0x10000
+  void* shared_memory = mmap((void *)SHARED_MEM_REG, shared_size, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  if (shared_memory == MAP_FAILED) {
     perror("Shared memory not allocated in a correct place, last errno: ");
     exit(-1);
   }
-  printf("Address for the shared memory with the enclave %p\n", shared_enclave);
+  printf("Address for the shared memory with the enclave %p\n", shared_memory);
+  memset(shared_memory, 0, shared_size);
+
+  void* memory_pool_m = mmap((void *)MEM_POOL, shared_size, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  if (memory_pool_m == MAP_FAILED) {
+    perror("Shared memory not allocated in a correct place, last errno: ");
+    exit(-1);
+  }
+  printf("Address for the memory pool %p\n", memory_pool_m);
+  memset(memory_pool_m, 0, shared_size);
  
 #define EVBASE 0x20000000
 
@@ -79,10 +88,14 @@ int main()
   }
   
   // Enqueue requests for enclave
-  // key_seed_t *seed = malloc(sizeof(key_seed_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+
+  // key_seed_t *seed = &mem->seed;
   uint64_t key_id = 0;
-  public_key_t *pk = malloc(sizeof(public_key_t));
-  signature_t *s = malloc(sizeof(signature_t)); 
+  public_key_t *pk = &mem->pk;
+  signature_t *s = &mem->s;
+
+  printf("pk is stored at address %lx\n", pk);
 
   printf("Creat SK\n");
   create_signing_key_pair(NULL, &key_id);
@@ -96,24 +109,28 @@ int main()
   // *** BEGINING BENCHMARK ***
   //riscv_perf_cntr_begin();
 
-  //printf("Sign\n");
-#define N 32
+  strncpy(mem->in_msg, "Hello World!", MSG_LEN);
+
+  printf("Sign\n");
+#define N 1
   for(int i = 0; i < N; i++) {
-    sign(a[i%len_a], len_elements[i%len_a], key_id, s); 
+    sign(mem->in_msg, MSG_LEN, key_id, s); 
   }   
 
-  //printf("Verify SK\n");
-  verify(s, a[N-1%len_a], len_elements[N-1%len_a], pk);
+  printf("Verify SK\n");
+  verify(s, mem->in_msg, MSG_LEN, pk);
 
-  //printf("Send Enclave Exit\n");
+  printf("Send Enclave Exit\n");
   enclave_exit();
   
   printf("Done sending RPC\n");
 
-  //printf("Right now in shared memory: %s\n", (char *) shared_enclave); 
-  val.shared_memory = (long) shared_enclave;
+  //printf("Right now in shared memory: %s\n", (char *) shared_memory); 
+  val.shared_memory = (long) shared_memory;
   val.enclave_start = (long)enclave;
+  printf("enclave start address %lx/n", enclave);
   val.enclave_end = (long)(enclave + sizefile);
+  printf("enclave end address %lx/n", val.enclave_end);
   printf("Sending ioctl CMD 2\n");
   fflush(stdout);
   ret = ioctl(fd, IOCTL_START_ENCLAVE, &val);

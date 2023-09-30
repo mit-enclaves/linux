@@ -53,4 +53,17 @@ typedef struct key_entry_t {
   secret_key_t sk;
 } key_entry_t;
 
+#define MAX_MSGS 10
+#define MSG_LEN 256
+
+typedef struct mem_pool_t {
+  bool msg_used[MAX_MSGS];
+  msg_t msgs[MAX_MSGS];
+  hash_t h;
+  signature_t s;
+  key_seed_t seed;
+  public_key_t pk;
+  char in_msg[MSG_LEN];
+} mem_pool_t;
+
 #endif // CRYPTO_ENCLAVE_UTIL_H

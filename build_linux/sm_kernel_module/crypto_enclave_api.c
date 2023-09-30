@@ -2,11 +2,20 @@
 #include "crypto_enclave_api.h"
 #include "msgq/msgq.h"
 
+
 void hash(const void * in_data,
     size_t in_data_size,
     hash_t * out_hash) {
-  queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = malloc(sizeof(msg_t));
+  queue_t *q = SHARED_REQU_QUEUE;
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_HASH;
   msg->args[0] = (uintptr_t) in_data;
   msg->args[1] = (uintptr_t) out_hash;
@@ -20,7 +29,15 @@ void create_signing_key_pair (
     const key_seed_t * in_seed,
     uint64_t * out_key_id) {
   queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = malloc(sizeof(msg_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_CREATE_SIGN_K;
   msg->args[0] = (uintptr_t) in_seed;
   msg->args[1] = (uintptr_t) out_key_id;
@@ -34,7 +51,15 @@ void get_public_signing_key (
     const uint64_t in_key_id,
     public_key_t * out_public_key) {
   queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = malloc(sizeof(msg_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_GET_SIGN_PK;
   msg->args[0] = (uintptr_t) in_key_id;
   msg->args[1] = (uintptr_t) out_public_key;
@@ -50,7 +75,15 @@ void sign (
     const uint64_t in_key_id,
     signature_t * out_signature) {
   queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = malloc(sizeof(msg_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_SIGN;
   msg->args[0] = (uintptr_t) in_message;
   msg->args[1] = (uintptr_t) in_message_size;
@@ -68,7 +101,15 @@ void verify (
     const size_t in_message_size,
     const public_key_t * in_public_key) {
   queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = malloc(sizeof(msg_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_VERIFY;
   msg->args[0] = (uintptr_t) in_signature;
   msg->args[1] = (uintptr_t) in_message;
@@ -85,7 +126,15 @@ void perform_key_agreement (
     const secret_key_t * secret_key_B,
     symmetric_key_t * out_key) {
   queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = malloc(sizeof(msg_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_KEY_AGREEMENT;
   msg->args[0] = (uintptr_t) public_key_A;
   msg->args[1] = (uintptr_t) secret_key_B;
@@ -98,7 +147,15 @@ void perform_key_agreement (
 
 void enclave_exit() {
   queue_t *q = SHARED_REQU_QUEUE;  
-  msg_t *msg = (msg_t *) malloc(sizeof(msg_t));
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+  msg_t *msg = NULL;
+  for(int i = 0; i < MAX_MSGS; i++){
+    if(!mem->msg_used[i]) {
+      mem->msg_used[i] = true;
+      msg = &mem->msgs[i];
+      break;
+    }
+  }
   msg->f = F_EXIT;
   int ret;
   do {

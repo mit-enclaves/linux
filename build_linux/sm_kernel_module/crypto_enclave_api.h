@@ -9,6 +9,8 @@
 #define SHARED_REQU_QUEUE ((queue_t *) SHARED_MEM_REG)
 #define SHARED_RESP_QUEUE ((queue_t *) (SHARED_MEM_REG + sizeof(queue_t)))
 
+#define MEM_POOL (0x8c000000)
+
 void hash(const void * in_data,
   size_t in_data_size,
   hash_t * out_hash);
