@@ -8,7 +8,7 @@ lkm_sm.ko: lkm_sm.c
 TEST_SRC := test.c inputs.c crypto_enclave_api.c msgq/msgq.c
 
 testenclave: $(TEST_SRC) 
-	$(CROSS_COMPILE)gcc -g -O -static -march=rv64g -o $@ $(TEST_SRC)
+	$(CROSS_COMPILE)gcc -g -O -static -march=rv64g -o $@ $(TEST_SRC) -lpthread
 
 modulesclean:
 	make -C ../riscv-linux M=$(PWD) clean

@@ -302,8 +302,8 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                         }
                         break;
         }
-        local_irq_enable();
-        printk(KERN_INFO "Renable interrupts\n");
+        //local_irq_enable();
+        //printk(KERN_INFO "Renable interrupts\n");
         return 0;
 }
 

@@ -1,5 +1,8 @@
+#define _GNU_SOURCE
 #include <string.h>
 #include <malloc.h>
+#include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -17,11 +20,6 @@
 #include "crypto_enclave_api.h"
 #include "test.h"
 
-// INPUTS
-extern int len_a;
-extern int len_elements[];
-extern char *a[];
-
 struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; uintptr_t shared_memory; };
 #define MAJOR_NUM 's'
 #define IOCTL_START_ENCLAVE _IOR(MAJOR_NUM, 0x1, struct run_enclave*)
@@ -36,26 +34,157 @@ long int size_file(const char *file_name)
     return -1;
 }
 
-int main()
-{
+// Function for the thread running the enclave
+void* enclave_thread(void *arg) {
+  cpu_set_t cpuset;
+  pthread_t thread;
+
+  thread = pthread_self();  // Get current thread
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+
+  if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) {
+    printf("[Core 0] Pthread affinity falure\n");
+  }
+  
   int fd, ret = 0;
-  struct arg_start_enclave val;
   fd = open("/dev/security_monitor", O_RDWR);
-  printf("File descriptor fd(%d)\n", fd);
+  printf("[Core 0] File descriptor fd(%d)\n", fd);
   if (fd < 0) {
-    printf("File open error with errno %d\n", errno);
-    return -errno;
+    printf("[Core 0] File open error with errno %d\n", errno);
+    return NULL;
   }
 
   FILE *ptr;
   ptr = fopen("/test/enclave.bin","rb");
   long int sizefile = size_file("/test/enclave.bin");
-  printf("Size enclave.bin (%ld)\n", sizefile);
+  printf("[Core 0] Size enclave.bin (%ld)\n", sizefile);
   char* enclave = memalign(1<<12,sizefile);
   size_t sizecopied;
   sizecopied = fread(enclave, sizefile, 1, ptr);
   fclose(ptr);
+
+  //printf("Right now in shared memory: %s\n", (char *) shared_memory); 
+  struct arg_start_enclave val;
+  val.shared_memory = (long) SHARED_MEM_REG;
+  val.enclave_start = (long)enclave;
+  val.enclave_end = (long)(enclave + sizefile);
+
+  printf("[Core 0] Asking the SM Kernel Module to launch the enclave.\n");
+  fflush(stdout);
+  ret = ioctl(fd, IOCTL_START_ENCLAVE, &val);
+  printf("[Core 0] SM Kernel Module returned with val (%d) errno (%d)\n", ret, errno);
+  //perror("IOCTL error: ");
+  close(fd);
+
+  return NULL;
+}
+
+// Function for the thread interacting with the user
+void* user_thread(void* arg) {
   
+  cpu_set_t cpuset;
+  pthread_t thread;
+
+  thread = pthread_self();  // Get current thread
+  CPU_ZERO(&cpuset);
+  CPU_SET(1, &cpuset);
+
+  if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset)) {
+    printf("[Core 1] Pthread affinity falure\n");
+  }
+
+  char command[256];
+  char message[256];
+  
+  // Enqueue requests for enclave
+  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
+
+  // key_seed_t *seed = &mem->seed;
+  uint64_t key_id = 0;
+
+  printf("[Core 1] RPC Create SK\n");
+  create_signing_key_pair(NULL, &key_id);
+
+  msg_t *m; 
+  queue_t *qresp = SHARED_RESP_QUEUE;
+
+  int res;
+  do {
+    res = pop(qresp, (void **) &m);
+  } while((res != 0) || m->f != F_CREATE_SIGN_K);
+
+  printf("[Core 1] Enclave is ready!\n");
+
+  printf("[Core 1] Usage: Enter command (hash/sign/get_pk/exit) followed by a message in quotes.\n");
+  while (1) {
+    int f = -1;
+    printf("[Core 1] Ready for new command!\n");
+    fgets(command, sizeof(command), stdin);
+
+    // Remove trailing newline character introduced by fgets
+    size_t len = strlen(command);
+    if (len > 0 && command[len-1] == '\n') {
+      command[len-1] = '\0';
+    }
+
+    if (strcmp(command, "exit") == 0) {
+      enclave_exit();
+      f = F_EXIT;
+    } else if (strcmp(command, "pk") == 0) {
+      public_key_t *pk = &mem->pk;
+      get_public_signing_key(key_id, pk);
+      f = F_GET_SIGN_PK;
+    } else if (strncmp(command, "sign ", 5) == 0) {
+      strncpy(message, command + 5, sizeof(message) - 1);
+      int lenght = strlen(message);
+      signature_t *s = &mem->s;
+      sign(message, lenght, key_id, s);
+      f = F_SIGN;
+    } else if (strncmp(command, "hash ", 5) == 0) {
+      strncpy(message, command + 5, sizeof(message) - 1);
+      int lenght = strlen(message);
+      hash_t *h = &mem->h;
+      hash(message, lenght, h);
+      f = F_HASH;
+    } else {
+      printf("[Core 1] Invalid command\n");
+      f = -1;
+    }
+
+    do {
+      res = pop(qresp, (void **) &m);
+      if((res == 0) && (m->f == F_SIGN)) {
+        printf("[Core 1] Signature received from the enclave :\n");
+        for (size_t i = 0; i < 64; i++) {
+          printf("%02X",((signature_t *) m->args[3])->bytes[i]);
+        }
+        printf("\n");
+      } else if((res == 0) && (m->f == F_HASH)) {
+        printf("[Core 1] Hash received from the enclave :\n");
+        for (size_t i = 0; i < 64; i++) {
+          printf("%02X",((hash_t *) m->args[1])->bytes[i]);
+        }
+        printf("\n");
+      } else if((res == 0) && (m->f == F_GET_SIGN_PK)) {
+        printf("[Core 1] Public key from the enclave :\n");
+        for (size_t i = 0; i < LENGTH_PK; i++) {
+          printf("%02X",((signature_t *) m->args[1])->bytes[i]);
+        }
+        printf("\n");
+      } else if((res == 0) && (m->f == F_EXIT)) {
+        printf("[Core 1] Enclave exited correctly!\n");
+        fflush(stdout);
+        return NULL;
+      }
+    } while((f != -1) && ((res != 0) || m->f != f));
+    fflush(stdout);
+  }
+  return NULL;
+}
+
+int main()
+{
   /* Allocate memory to share with the enclave. Need to find a proper place for that */
 #define shared_size 0x10000
   void* shared_memory = mmap((void *)SHARED_MEM_REG, shared_size, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
@@ -73,7 +202,7 @@ int main()
   }
   printf("Address for the memory pool %p\n", memory_pool_m);
   memset(memory_pool_m, 0, shared_size);
- 
+
 #define EVBASE 0x20000000
 
   void* enclave_address_space = mmap((void *)EVBASE, REGION_SIZE, PROT_READ | PROT_WRITE , MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
@@ -81,61 +210,23 @@ int main()
     perror("Enclave virtual memory not reserved...\n");
     exit(-1);
   }
-  
-  printf("Creating RPC for the enclave");
-  // Enqueue requests for enclave
-  mem_pool_t *mem = (mem_pool_t *)MEM_POOL;
 
-  // key_seed_t *seed = &mem->seed;
-  uint64_t key_id = 0;
-  public_key_t *pk = &mem->pk;
-  signature_t *s = &mem->s;
+  pthread_t thread1, thread2;
 
-  printf("[RPC] Create SK\n");
-  create_signing_key_pair(NULL, &key_id);
-  printf("[RPC] Create PK\n");
-  get_public_signing_key(key_id, pk);
-
-  msg_t *m; 
-  queue_t *qresp = SHARED_RESP_QUEUE;
-  int res;
-
-  // *** BEGINING BENCHMARK ***
-  //riscv_perf_cntr_begin();
-
-  strncpy(mem->in_msg, "Hello World!", MSG_LEN);
-
-  printf("[RPC] Sign\n");
-#define N 1
-  for(int i = 0; i < N; i++) {
-    sign(mem->in_msg, MSG_LEN, key_id, s); 
-  }   
-
-  printf("[RPC] Verify SK\n");
-  verify(s, mem->in_msg, MSG_LEN, pk);
-
-  printf("[RPC] Enclave Exit\n");
-  enclave_exit();
-  
-  printf("Done creating RPC\n");
-
-  //printf("Right now in shared memory: %s\n", (char *) shared_memory); 
-  val.shared_memory = (long) shared_memory;
-  val.enclave_start = (long)enclave;
-  val.enclave_end = (long)(enclave + sizefile);
-  printf("Asking the SM Kernel Module to launch the enclave.\n");
-  fflush(stdout);
-  ret = ioctl(fd, IOCTL_START_ENCLAVE, &val);
-  printf("SM Kernel Module returned with val (%d) errno (%d)\n", ret, errno);
-  if (ret == 0) {
-    do {
-      res = pop(qresp, (void **) &m);
-      if((res == 0) && (m->f == F_VERIFY)) {
-        printf("Return value from Verify RPC: %d\n", m->ret);
-      }
-    } while((res != 0) || (m->f != F_EXIT));
+  // Create threads
+  if (pthread_create(&thread1, NULL, &enclave_thread, NULL)) {
+    fprintf(stderr, "Error creating enclave thread\n");
+    return 1;
   }
-  fflush(stdout);
-  //perror("IOCTL error: ");
-  close(fd);
+
+  if (pthread_create(&thread2, NULL, &user_thread, NULL)) {
+    fprintf(stderr, "Error creating user thread\n");
+    return 1;
   }
+
+  // Wait for the threads to finish
+  pthread_join(thread1, NULL);
+  pthread_join(thread2, NULL);
+
+  return 0;
+}
