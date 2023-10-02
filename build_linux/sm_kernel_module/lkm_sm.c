@@ -151,7 +151,7 @@ void start_enclave(struct arg_start_enclave *arg)
   os_addr = (uintptr_t) arg->enclave_start;
   virtual_addr = EVBASE;
 
-  printk(KERN_INFO "Start loading program\n");
+  printk(KERN_INFO "Start loading enclave program to private memory\n");
 
   num_pages_enclave = ((((uint64_t) arg->enclave_end) - ((uint64_t) arg->enclave_start)) / PAGE_SIZE);
   
@@ -168,13 +168,14 @@ void start_enclave(struct arg_start_enclave *arg)
       return; 
     }
 
-    printk(KERN_INFO "Just loaded page %x\n", page_count);
+    //printk(KERN_INFO "Just loaded page %x\n", page_count);
     phys_addr    += PAGE_SIZE;
     os_addr      += PAGE_SIZE;
     virtual_addr += PAGE_SIZE;
 
   }
 
+  printk(KERN_INFO "Enclave program was loaded in %x pages\n", page_count);
   size_enclave_metadata = sm_enclave_metadata_pages(num_mailboxes);
 
   thread_id = enclave_id + (size_enclave_metadata * PAGE_SIZE);
@@ -309,14 +310,8 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 static int __init sm_mod_init(void)
 {
-  int region;
   int ret_val;
   printk(KERN_INFO "Initializing the SM Kernel Module\n");
-
-  for(region = 0; region < 64; region++) {
-    int result = sm_region_owner(region);
-    printk(KERN_INFO "Owner of region %d is %d\n", region, result);
-  }
 
   ret_val = misc_register(&security_monitor_misc);
   if (unlikely(ret_val)) {

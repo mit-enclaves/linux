@@ -1,5 +1,5 @@
 ::sysinit:/bin/busybox --install -s
 ::sysinit:/bin/busybox mount -t proc proc /proc
 ::sysinit:/bin/busybox mount -t tmpfs tmpfs /tmp
-/dev/console::sysinit:-/test/run.sh
+/dev/console::sysinit:-/test/setup_sm_km.sh
 /dev/console::sysinit:-/bin/ash
