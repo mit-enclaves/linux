@@ -115,71 +115,56 @@ void* user_thread(void* arg) {
   } while((res != 0) || m->f != F_CREATE_SIGN_K);
 
   printf("[Core 1] Enclave is ready!\n");
+  
+  printf("[Core 1] Requesting the enclave PK\n");
+  public_key_t *pk = &mem->pk;
+  get_public_signing_key(key_id, pk);
 
-  printf("[Core 1] Usage: Enter command (hash/sign/get_pk/exit) followed by a message in quotes.\n");
-  while (1) {
-    int f = -1;
-    printf("[Core 1] Ready for new command!\n");
-    fgets(command, sizeof(command), stdin);
-
-    // Remove trailing newline character introduced by fgets
-    size_t len = strlen(command);
-    if (len > 0 && command[len-1] == '\n') {
-      command[len-1] = '\0';
-    }
-
-    if (strcmp(command, "exit") == 0) {
-      enclave_exit();
-      f = F_EXIT;
-    } else if (strcmp(command, "pk") == 0) {
-      public_key_t *pk = &mem->pk;
-      get_public_signing_key(key_id, pk);
-      f = F_GET_SIGN_PK;
-    } else if (strncmp(command, "sign ", 5) == 0) {
-      strncpy(message, command + 5, sizeof(message) - 1);
-      int lenght = strlen(message);
-      signature_t *s = &mem->s;
-      sign(message, lenght, key_id, s);
-      f = F_SIGN;
-    } else if (strncmp(command, "hash ", 5) == 0) {
-      strncpy(message, command + 5, sizeof(message) - 1);
-      int lenght = strlen(message);
-      hash_t *h = &mem->h;
-      hash(message, lenght, h);
-      f = F_HASH;
-    } else {
-      printf("[Core 1] Invalid command\n");
-      f = -1;
-    }
-
-    do {
-      res = pop(qresp, (void **) &m);
-      if((res == 0) && (m->f == F_SIGN)) {
-        printf("[Core 1] Signature received from the enclave :\n");
-        for (size_t i = 0; i < 64; i++) {
-          printf("%02X",((signature_t *) m->args[3])->bytes[i]);
-        }
-        printf("\n");
-      } else if((res == 0) && (m->f == F_HASH)) {
-        printf("[Core 1] Hash received from the enclave :\n");
-        for (size_t i = 0; i < 64; i++) {
-          printf("%02X",((hash_t *) m->args[1])->bytes[i]);
-        }
-        printf("\n");
-      } else if((res == 0) && (m->f == F_GET_SIGN_PK)) {
-        printf("[Core 1] Public key from the enclave :\n");
-        for (size_t i = 0; i < LENGTH_PK; i++) {
-          printf("%02X",((signature_t *) m->args[1])->bytes[i]);
-        }
-        printf("\n");
-      } else if((res == 0) && (m->f == F_EXIT)) {
-        printf("[Core 1] Enclave exited correctly!\n");
-        fflush(stdout);
-        return NULL;
+  printf("[Core 1] Requesting the enclave to sign \"Hello World!\"\n");
+  strcpy(message, "Hello World!");
+  int lenght = strlen(message);
+  signature_t *s = &mem->s;
+  sign(message, lenght, key_id, s);
+      
+  do {
+    res = pop(qresp, (void **) &m);
+    if((res == 0) && (m->f == F_SIGN)) {
+      printf("[Core 1] Signature received from the enclave :\n");
+      for (size_t i = 0; i < 64; i++) {
+        printf("%02X",((signature_t *) m->args[3])->bytes[i]);
       }
-    } while((f != -1) && ((res != 0) || m->f != f));
-    fflush(stdout);
-  }
+      printf("\n");
+    } else if((res == 0) && (m->f == F_HASH)) {
+      printf("[Core 1] Hash received from the enclave :\n");
+      for (size_t i = 0; i < 64; i++) {
+        printf("%02X",((hash_t *) m->args[1])->bytes[i]);
+      }
+      printf("\n");
+    } else if((res == 0) && (m->f == F_GET_SIGN_PK)) {
+      printf("[Core 1] Public key from the enclave :\n");
+      for (size_t i = 0; i < LENGTH_PK; i++) {
+        printf("%02X",((signature_t *) m->args[1])->bytes[i]);
+      }
+      printf("\n");
+    } else if((res == 0) && (m->f == F_EXIT)) {
+      printf("[Core 1] Enclave exited correctly!\n");
+      fflush(stdout);
+      return NULL;
+    }
+  } while((res != 0) || m->f != F_SIGN);
+  
+  enclave_exit();
+  
+  do {
+    res = pop(qresp, (void **) &m);
+    if((res == 0) && (m->f == F_EXIT)) {
+      printf("[Core 1] Enclave exited correctly!\n");
+      fflush(stdout);
+      return NULL;
+    }
+  } while((res != 0) || m->f != F_SIGN);
+  
+  fflush(stdout);
   return NULL;
 }
 
