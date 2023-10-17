@@ -28,12 +28,16 @@ This repository contains tools and scripts to compile Linux to run on Citadel. I
 
 ## Make Target
 
-### build_linux
+### build the sm kernel module first
 
-  to build the default vmlinux. At the moment it requires to first build the sm kernel module
+  At the moment it requires to first build the sm kernel module.
   In order to do so, go in build_linix/sm_kernel_module
   run 'make ARCH=riscv CROSS_COMPILE=riscv64-unknown-linux-gnu-'
   then 'make test'
+  
+### build_linux
+
+  To build the default vmlinux. 
 
 ### test_linux
 
