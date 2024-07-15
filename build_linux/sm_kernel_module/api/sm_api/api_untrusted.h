@@ -64,7 +64,7 @@ static inline api_result_t sm_region_block (region_id_t id) {
   return SM_API_CALL(SM_REGION_BLOCK, id, 0, 0, 0, 0, 0, 0);
 }
 
-static inline api_result_t sm_region_update (void) {
+static inline api_result_t sm_region_update () {
   return SM_API_CALL(SM_REGION_UPDATE, 0, 0, 0, 0, 0, 0, 0);
 }
 
@@ -94,10 +94,6 @@ static inline region_state_t sm_region_state (region_id_t id) {
 
 static inline api_result_t sm_region_cache_partitioning ( cache_partition_t *part ) {
   return SM_API_CALL(SM_REGION_CACHE_PART, part, 0, 0, 0, 0, 0, 0);
-}
-
-static inline api_result_t sm_region_flush ( region_id_t id ) {
-  return SM_API_CALL(SM_REGION_FLUSH, id, 0, 0, 0, 0, 0, 0);
 }
 
 static inline api_result_t sm_thread_delete (thread_id_t thread_id) {

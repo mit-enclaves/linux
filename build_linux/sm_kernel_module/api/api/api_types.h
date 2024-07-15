@@ -1,9 +1,9 @@
 #ifndef API_TYPES_H
 #define API_TYPES_H
 
-//#include <stdint.h>
-//#include <stdbool.h>
-#include "api_crypto_types.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <api_crypto_types.h>
 
 // SM API Types
 // --------------------
@@ -98,7 +98,7 @@ typedef enum {
 } region_type_t;
 
 typedef struct {
-  char lgsizes[64]; // TODO: fix hardcoding here...
+  uint8_t lgsizes[64]; // TODO: fix hardcoding here...
 } cache_partition_t;
 
 // SM API Syscall codes

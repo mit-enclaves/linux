@@ -1,9 +1,9 @@
 #ifndef API_TYPES_H
 #define API_TYPES_H
 
-//#include <stdint.h>
-//#include <stdbool.h>
-#include "api_crypto_types.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <api_crypto_types.h>
 
 // SM API Types
 // --------------------
@@ -92,13 +92,13 @@ typedef enum {
 
 typedef enum {
   REGION_TYPE_SM = 0,
-  REGION_TYPE_UNTRUSTED = 1,
-  REGION_TYPE_ENCLAVE = 2,
-  REGION_TYPE_METADATA = 3,
+  REGION_TYPE_UNTRUSTED = 0,
+  REGION_TYPE_ENCLAVE = 1,
+  REGION_TYPE_METADATA = 2,
 } region_type_t;
 
 typedef struct {
-  char lgsizes[64]; // TODO: fix hardcoding here...
+  uint8_t lgsizes[64]; // TODO: fix hardcoding here...
 } cache_partition_t;
 
 // SM API Syscall codes
@@ -132,7 +132,6 @@ typedef struct {
 #define SM_REGION_OWNER                     (1038)
 #define SM_REGION_STATE                     (1039)
 #define SM_REGION_CACHE_PART                (1040)
-#define SM_REGION_FLUSH                     (1041)
 
 #define SM_THREAD_DELETE                    (1050)
 #define SM_THREAD_LOAD                      (1051)

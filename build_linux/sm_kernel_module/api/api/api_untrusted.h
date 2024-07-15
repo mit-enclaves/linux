@@ -64,7 +64,7 @@ static inline api_result_t sm_region_block (region_id_t id) {
   return SM_API_CALL(SM_REGION_BLOCK, id, 0, 0, 0, 0, 0, 0);
 }
 
-static inline api_result_t sm_region_update (void) {
+static inline api_result_t sm_region_update () {
   return SM_API_CALL(SM_REGION_UPDATE, 0, 0, 0, 0, 0, 0, 0);
 }
 

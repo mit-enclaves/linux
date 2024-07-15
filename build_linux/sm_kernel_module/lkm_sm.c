@@ -21,8 +21,12 @@
 #define EVBASE 0x20000000
 
 struct arg_start_enclave { api_result_t result; uintptr_t enclave_start; uintptr_t enclave_end; uintptr_t shared_memory; };
+struct arg_region_update { api_result_t result; };
+struct arg_region_owner { api_result_t result; enclave_id_t enc_id;};
 #define MAJOR_NUM 's'
-#define IOCTL_START_ENCLAVE _IOR(MAJOR_NUM, 0x1, struct arg_stat_enclave*)
+#define IOCTL_START_ENCLAVE _IOR(MAJOR_NUM, 0x1, struct run_enclave*)
+#define IOCTL_REGION_UPDATE _IOR(MAJOR_NUM, 0x2, struct arg_region_update*)
+#define IOCTL_REGION_OWNER  _IOR(MAJOR_NUM, 0x3, struct arg_region_owner*)
 
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Computer Structure Group CSAIL");
@@ -63,52 +67,63 @@ void start_enclave(struct arg_start_enclave *arg)
     region1 = (uintptr_t) aligned_dma_addr;
     region2 = (uintptr_t) aligned_dma_addr+0x2000000;
   }
+  region1_id = addr_to_region_id((uintptr_t) region1);
+  region2_id = addr_to_region_id((uintptr_t) region2);
   printk(KERN_INFO "Address region1 is %lx",region1);
   printk(KERN_INFO "Address region2 is %lx",region2);
-  region2_id = addr_to_region_id((uintptr_t) region2);
-  arg->result = sm_region_block(region2_id);
+  printk(KERN_INFO "Id region1 is %llx",region1_id);
+  printk(KERN_INFO "Id region2 is %llx",region2_id);
+  
+  do { arg->result = sm_region_block(region2_id); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
-    printk(KERN_ALERT "sm_region_block FAILED with error code %d\n", arg->result);
+    printk(KERN_ALERT "sm_region_block FAILED on region %lld with error code %d\n", region2_id, arg->result);
     return; 
   }
-
-  arg->result = sm_region_free(region2_id);
+  
+  do { arg->result = sm_region_block(region1_id); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
-    printk(KERN_ALERT "sm_region_free FAILED with error code %d\n ", arg->result);
+    printk(KERN_ALERT "sm_region_block FAILED on region %lld with error code %d\n", region1_id, arg->result);
     return;
   }
 
-  arg->result = sm_region_metadata_create(region2_id);
+  do { arg->result = sm_region_free(region2_id); } 
+  while((arg->result == MONITOR_INVALID_STATE) || (arg->result == MONITOR_CONCURRENT_CALL));
   if(arg->result != MONITOR_OK) {
-    printk(KERN_ALERT "sm_region_metadata_create FAILED with error code %d\n",arg->result);
-    return; 
-  }
-  }
-  region1_id = addr_to_region_id((uintptr_t) region1);
-  region_metadata_start = sm_region_metadata_start();
-  printk(KERN_INFO "Address metadata is %llx",region_metadata_start);
-  enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
-  num_mailboxes = 1;
-
-  arg->result = sm_enclave_create(enclave_id, EVBASE, REGION_MASK, num_mailboxes, true);
-  if(arg->result != MONITOR_OK) {
-    printk(KERN_ALERT "sm_enclave_create FAILED with error code %d\n", arg->result);
+    printk("sm_region_free FAILED with error code %d \n\n", arg->result);
     return;
   }
-
-  arg->result = sm_region_block(region1_id);
-  if(arg->result != MONITOR_OK) {
-    printk(KERN_ALERT "sm_region_block FAILED with error code %d\n", arg->result);
-    return;
-  }
-
-  arg->result = sm_region_free(region1_id);
+  
+  do{ arg->result = sm_region_free(region1_id); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_free FAILED with error code %d\n", arg->result);
     return; 
   }
 
-  arg->result = sm_region_assign(region1_id, enclave_id);
+  do{ arg->result = sm_region_metadata_create(region2_id); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
+  if(arg->result != MONITOR_OK) {
+    printk(KERN_ALERT "sm_region_metadata_create FAILED with error code %d\n",arg->result);
+    return; 
+  }
+  }
+  region_metadata_start = sm_region_metadata_start();
+  printk(KERN_INFO "Address metadata is %llx",region_metadata_start);
+  enclave_id = ((uintptr_t) region2) + (PAGE_SIZE * region_metadata_start);
+  num_mailboxes = 1;
+
+  do { arg->result = sm_enclave_create(enclave_id, EVBASE, REGION_MASK, num_mailboxes, true); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
+  if(arg->result != MONITOR_OK) {
+    printk(KERN_ALERT "sm_enclave_create FAILED with error code %d\n", arg->result);
+    return;
+  }
+
+
+  do{ arg->result = sm_region_assign(region1_id, enclave_id);}
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_region_assign FAILED with error code %d\n", arg->result);
     return; 
@@ -117,7 +132,8 @@ void start_enclave(struct arg_start_enclave *arg)
   enclave_handler_address = (uintptr_t) region1;
   page_table_address = enclave_handler_address + (STACK_SIZE * NUM_CORES) + HANDLER_LEN;
 
-  arg->result = sm_enclave_load_handler(enclave_id, enclave_handler_address);
+  do { arg->result = sm_enclave_load_handler(enclave_id, enclave_handler_address); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_handler FAILED with error code %d\n", arg->result);
     return; 
@@ -125,7 +141,8 @@ void start_enclave(struct arg_start_enclave *arg)
 
   printk(KERN_INFO "Enclave Page Table Root is %lx",page_table_address);
 
-  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 3, NODE_ACL);
+  do { arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 3, NODE_ACL); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
     return; 
@@ -133,7 +150,8 @@ void start_enclave(struct arg_start_enclave *arg)
 
   page_table_address += PAGE_SIZE;
 
-  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 2, NODE_ACL);
+  do { arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 2, NODE_ACL); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
     return; 
@@ -141,7 +159,8 @@ void start_enclave(struct arg_start_enclave *arg)
 
   page_table_address += PAGE_SIZE;
 
-  arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 1, NODE_ACL);
+  do { arg->result = sm_enclave_load_page_table(enclave_id, page_table_address, EVBASE, 1, NODE_ACL); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_load_page_table FAILED with error code %d\n", arg->result);
     return; 
@@ -162,7 +181,8 @@ void start_enclave(struct arg_start_enclave *arg)
   
   for(page_count = 0; page_count < num_pages_enclave; page_count++) {
 
-    arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL);
+    do { arg->result = sm_enclave_load_page(enclave_id, phys_addr, virtual_addr, os_addr, LEAF_ACL); }
+    while (arg->result == MONITOR_CONCURRENT_CALL);
     if(arg->result != MONITOR_OK) {
       printk(KERN_ALERT "sm_enclave_load_page FAILED with error code %d\n", arg->result);
       return; 
@@ -183,20 +203,23 @@ void start_enclave(struct arg_start_enclave *arg)
   
   entry_pc = EVBASE;
 
-  arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, arg->shared_memory, timer_limit);
+  do { arg->result = sm_thread_load(enclave_id, thread_id, entry_pc, arg->shared_memory, timer_limit); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_thread_load FAILED with error code %d\n", arg->result);
     return; 
   }
 
   printk(KERN_INFO "Enclave init\n");
-  arg->result = sm_enclave_init(enclave_id);
+  do { arg->result = sm_enclave_init(enclave_id); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   if(arg->result != MONITOR_OK) {
     printk(KERN_ALERT "sm_enclave_init FAILED with error code %d\n", arg->result);
     return; 
   }
   printk(KERN_INFO "Enclave enter\n");
-  arg->result = sm_enclave_enter(enclave_id, thread_id);
+  do { arg->result = sm_enclave_enter(enclave_id, thread_id); }
+  while (arg->result == MONITOR_CONCURRENT_CALL);
   printk(KERN_INFO "Enclaved finished executing with : %d\n", arg->result); 
 
   arg->result = sm_thread_delete(thread_id);
@@ -256,10 +279,11 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         size_t size_enclave, padded_size_enclave, size_padding;
         void* addr;
         int iterateword;
+	enclave_id_t id;
 
-        struct arg_start_enclave arg_struct;
          switch(cmd) {
                 case IOCTL_START_ENCLAVE:
+			struct arg_start_enclave arg_struct;
                         bytes_from_user = copy_from_user(&arg_struct ,(int32_t*) arg, sizeof(arg_struct));
                         if (bytes_from_user != 0) {
                                 printk(KERN_ALERT "Error while trying to copy argument from user space to kernel space\n" );
@@ -300,23 +324,33 @@ static long sm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                                 printk(KERN_ALERT "Error while trying to copy argument from user space to kernel space\n" );
                         }
                         break;
+		case IOCTL_REGION_UPDATE:
+			sm_region_update();
+			break;
+		case IOCTL_REGION_OWNER:
+			struct arg_region_owner arg_struct_2;
+                        bytes_from_user = copy_from_user(&arg_struct_2 ,(int32_t*) arg, sizeof(arg_struct_2));
+		       	id = arg_struct_2.enc_id;
+			arg_struct_2.result = sm_region_owner(id);
+                        bytes_to_user = copy_to_user((void*) arg, &arg_struct_2, sizeof(arg_struct_2));
+			break;
         }
-        //local_irq_enable();
-        printk(KERN_INFO "renable timer interrupts\n");
+        local_irq_enable();
+        //printk(KERN_INFO "renable timer interrupts\n");
         return 0;
 }
 
 
 static int __init sm_mod_init(void)
 {
-  int region;
+  //int region;
   int ret_val;
   printk(KERN_INFO "Kernel module try to do some enclave stuff!\n");
 
-  for(region = 0; region < 64; region++) {
-    int result = sm_region_owner(region);
-    printk(KERN_INFO "Owner of region %d is %d\n", region, result);
-  }
+  //for(region = 0; region < 64; region++) {
+  //  int result = sm_region_owner(region);
+  //  printk(KERN_INFO "Owner of region %d is %d\n", region, result);
+  //}
 
   ret_val = misc_register(&security_monitor_misc);
   if (unlikely(ret_val)) {
